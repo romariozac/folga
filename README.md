@@ -12,7 +12,7 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 | Pergunta | Onde |
 |---|---|
 | Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. A aba **Mês** mostra previsto x realizado por categoria. |
-| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **linha do acumulado** (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
+| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **curva do acumulado** numa faixa logo abaixo das barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
 | Quanto já guardei e para quê? | **Metas**: o total guardado (reserva, metas e outros investimentos), quanto terá em 12 meses seguindo o plano, cada meta com barra de progresso e ritmo, e a reserva de emergência. |
 | Como me manter animado? | **Conquistas** (toque no seu nível, no topo, ou no atalho da aba Metas): níveis, XP, semanas em dia, medalhas e a “Jornada Cerbasi”. |
 
@@ -120,7 +120,7 @@ No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito 
 
 | Ideia do método | No Folga |
 |---|---|
-| Orçamento é **projetar** o que vem pela frente, não só controlar o passado | Aba Plano: projeção de 12 meses com sobra do mês e linha do acumulado |
+| Orçamento é **projetar** o que vem pela frente, não só controlar o passado | Aba Plano: projeção de 12 meses com sobra do mês e curva do acumulado |
 | A planilha coloca **previsto x realizado**, mês a mês, por categoria (habitação, transporte, saúde, educação, despesas pessoais, lazer…) | Aba Mês e a exportação “planilha de 12 meses” (.csv para Excel/Google Planilhas) |
 | **Inverter a ordem**: definir quanto guardar para os sonhos e só depois gastar o que sobra | Aba Metas (cada sonho com valor, prazo e quanto guardar por mês, já no plano) e o item “Pague-se primeiro” (sugestão de 5 a 20% da renda) |
 | Gastos **anuais/sazonais** (IPVA, IPTU, matrícula, material escolar, presentes) | Itens “meses do ano”, alerta dos meses no vermelho e a dica de quanto separar por mês |
@@ -192,7 +192,7 @@ codigo/src/
     catui.js    busca de categorias, seletor em 2 níveis, criar subcategoria, tela de atalhos
     game.js     XP, níveis, semanas em dia, medalhas
     store.js    localStorage + sincronização com a conta (quando aberto no Claude)
-    charts.js   gráfico de barras com a linha do acumulado, em SVG
+    charts.js   gráfico de barras e a curva do acumulado, em SVG
 ```
 
 ## Ideias para as próximas versões

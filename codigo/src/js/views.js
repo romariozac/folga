@@ -24,8 +24,9 @@ function greeting() {
   return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
 }
 
+// a curva do acumulado tem faixa própria, com título, logo abaixo das barras (não precisa entrar na legenda)
 export const legendHTML = () =>
-  `<div class="legend"><span><i class="sw in"></i>Entradas</span><span><i class="sw out"></i>Despesas</span><span><i class="sw inv"></i>Investimento</span><span><i class="sw-line"></i>Acumulado</span></div>`;
+  `<div class="legend"><span><i class="sw in"></i>Entradas</span><span><i class="sw out"></i>Despesas</span><span><i class="sw inv"></i>Investimento</span></div>`;
 
 // ---------- topo ----------
 export function topbarHTML() {

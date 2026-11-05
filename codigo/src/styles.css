@@ -15,6 +15,9 @@
   --s-in: #2f6fdb;
   --s-out: #e5602f;
   --s-inv: #0f9e74;
+  /* curva do acumulado: ameixa, distinta de azul/laranja/verde (validada para daltonismo) */
+  --s-acc: #a8489e;
+  --t-acc: rgba(168, 72, 158, 0.13);
   /* partes das barras divididas (validadas como rampa de um tom: laranja = despesas, verde = guardado) */
   --p-fixas: #b8461c;
   --p-verbas: #e5602f;
@@ -57,6 +60,8 @@
     --s-in: #4a86ea;
     --s-out: #e0703f;
     --s-inv: #1fae80;
+    --s-acc: #c565b8;
+    --t-acc: rgba(197, 101, 184, 0.14);
     --p-fixas: #f0a07c;
     --p-verbas: #e0703f;
     --p-anuais: #a84a24;
@@ -93,6 +98,8 @@
   --s-in: #4a86ea;
   --s-out: #e0703f;
   --s-inv: #1fae80;
+  --s-acc: #c565b8;
+  --t-acc: rgba(197, 101, 184, 0.14);
   --p-fixas: #f0a07c;
   --p-verbas: #e0703f;
   --p-anuais: #a84a24;
@@ -880,7 +887,7 @@ h3 {
 .chart-box {
   position: relative;
   margin: 8px -2px 0;
-  min-height: 190px;
+  min-height: 262px;
 }
 .chart {
   display: block;
@@ -3133,25 +3140,37 @@ details.tech code {
   font-size: 12.5px;
 }
 
-/* ---------- gráfico: linha do acumulado ---------- */
+/* ---------- gráfico: curva do acumulado (faixa própria, abaixo das barras) ---------- */
 .sw-line {
   display: inline-block;
   width: 14px;
-  height: 2.5px;
+  height: 3px;
   border-radius: 2px;
-  background: var(--ink);
+  background: var(--s-acc);
   flex: none;
-}
-.c-tip .sw-line {
-  background: var(--paper);
 }
 .c-acc {
   fill: none;
-  stroke: var(--ink);
+  stroke: var(--s-acc);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
   pointer-events: none;
+}
+.c-acc-area {
+  fill: var(--t-acc);
+  stroke: none;
+  pointer-events: none;
+}
+.c-acc-area.neg {
+  fill: color-mix(in oklab, var(--crit) 16%, transparent);
+}
+.c-lane-cap {
+  fill: var(--muted);
+  font-size: 10.5px;
+  font-weight: 650;
+  font-family: var(--font);
+  letter-spacing: 0.02em;
 }
 .c-accdot {
   pointer-events: none;
@@ -3166,7 +3185,7 @@ details.tech code {
   fill: var(--card);
 }
 .c-dot {
-  fill: var(--ink);
+  fill: var(--s-acc);
 }
 .c-acc-label {
   fill: var(--ink);
