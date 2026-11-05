@@ -12,7 +12,7 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 | Pergunta | Onde |
 |---|---|
 | Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. A aba **Mês** mostra previsto x realizado por categoria. |
-| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **curva do acumulado** numa faixa logo abaixo das barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
+| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
 | Quanto já guardei e para quê? | **Metas**: o total guardado (reserva, metas e outros investimentos), quanto terá em 12 meses seguindo o plano, cada meta com barra de progresso e ritmo, e a reserva de emergência. |
 | Como me manter animado? | **Conquistas** (toque no seu nível, no topo, ou no atalho da aba Metas): níveis, XP, semanas em dia, medalhas e a “Jornada Cerbasi”. |
 

@@ -17,7 +17,6 @@
   --s-inv: #0f9e74;
   /* curva do acumulado: ameixa, distinta de azul/laranja/verde (validada para daltonismo) */
   --s-acc: #a8489e;
-  --t-acc: rgba(168, 72, 158, 0.13);
   /* partes das barras divididas (validadas como rampa de um tom: laranja = despesas, verde = guardado) */
   --p-fixas: #b8461c;
   --p-verbas: #e5602f;
@@ -61,7 +60,6 @@
     --s-out: #e0703f;
     --s-inv: #1fae80;
     --s-acc: #c565b8;
-    --t-acc: rgba(197, 101, 184, 0.14);
     --p-fixas: #f0a07c;
     --p-verbas: #e0703f;
     --p-anuais: #a84a24;
@@ -99,7 +97,6 @@
   --s-out: #e0703f;
   --s-inv: #1fae80;
   --s-acc: #c565b8;
-  --t-acc: rgba(197, 101, 184, 0.14);
   --p-fixas: #f0a07c;
   --p-verbas: #e0703f;
   --p-anuais: #a84a24;
@@ -887,7 +884,7 @@ h3 {
 .chart-box {
   position: relative;
   margin: 8px -2px 0;
-  min-height: 262px;
+  min-height: 236px;
 }
 .chart {
   display: block;
@@ -3140,52 +3137,54 @@ details.tech code {
   font-size: 12.5px;
 }
 
-/* ---------- gráfico: curva do acumulado (faixa própria, abaixo das barras) ---------- */
+/* ---------- gráfico: curva do acumulado, por cima das barras ---------- */
 .sw-line {
   display: inline-block;
-  width: 14px;
+  width: 16px;
   height: 3px;
   border-radius: 2px;
   background: var(--s-acc);
   flex: none;
 }
-.c-acc {
+.c-acc-halo {
   fill: none;
-  stroke: var(--s-acc);
-  stroke-width: 2;
+  stroke: var(--card);
+  stroke-width: 7;
   stroke-linejoin: round;
   stroke-linecap: round;
   pointer-events: none;
 }
-.c-acc-area {
-  fill: var(--t-acc);
-  stroke: none;
+.c-acc {
+  fill: none;
+  stroke: var(--s-acc);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
   pointer-events: none;
 }
-.c-acc-area.neg {
-  fill: color-mix(in oklab, var(--crit) 16%, transparent);
-}
-.c-lane-cap {
-  fill: var(--muted);
-  font-size: 10.5px;
-  font-weight: 650;
-  font-family: var(--font);
-  letter-spacing: 0.02em;
+.c-acc.neg {
+  stroke: var(--crit);
 }
 .c-accdot {
   pointer-events: none;
+}
+.c-sel {
+  fill: var(--s-acc);
   opacity: 0;
   transition: opacity 0.15s;
 }
-.c-accdot.end,
-.c-accdot.on {
-  opacity: 1;
+.c-accdot.on .c-sel {
+  opacity: 0.25;
 }
 .c-ring {
   fill: var(--card);
 }
 .c-dot {
   fill: var(--s-acc);
+}
+.c-accdot.neg .c-dot,
+.c-accdot.neg .c-sel {
+  fill: var(--crit);
 }
 .c-acc-label {
   fill: var(--ink);

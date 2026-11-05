@@ -1,7 +1,6 @@
-// Gráfico de projeção (SVG feito à mão), em dois painéis alinhados mês a mês:
-// em cima, uma barra de Entradas e uma de Saídas (despesas + investimento empilhados);
-// embaixo, numa faixa própria, a curva da sobra acumulada (com área suave; abaixo de zero fica vermelha).
-// Cada painel tem a sua escala, então as barras não encolhem quando o acumulado cresce ou fica negativo.
+// Gráfico de projeção (SVG feito à mão): por mês, uma barra de Entradas e uma de Saídas (despesas +
+// investimento empilhados) e, por cima, a curva suave da sobra acumulada, com um ponto em cada mês.
+// Um único eixo em R$ (as barras e o acumulado são a mesma unidade). Abaixo de zero, a curva fica vermelha.
 import { num, monthShort } from './util.js';
 
 let uid = 0; // ids únicos para os recortes (pode haver mais de um gráfico na tela)
@@ -63,26 +62,30 @@ function smoothPath(pts) {
 
 export function projectionSVG(rows, width) {
   const W = Math.max(260, Math.round(width));
-  const padL = 34, padR = 2, padT = 8;
-  const barsH = 130; // painel das barras
-  const gap = 26; // espaço entre os painéis (com o título "Acumulado")
-  const laneH = 50; // faixa do acumulado
-  const padB = 46; // meses, anos e alertas
-  const H = padT + barsH + gap + laneH + padB;
+  const padL = 34, padR = 4, padT = 18, padB = 46;
+  const H = 236;
   const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
   const n = rows.length;
   const slot = plotW / n;
   const cx = (i) => padL + i * slot + slot / 2;
+  const accs = rows.map((r) => r.acc || 0);
   let s = '';
 
-  // ---- painel das barras: escala de 0 ao maior valor ----
-  const maxV = niceMax(Math.max(1, ...rows.map((r) => Math.max(r.receita, r.despesa + r.invest))));
-  const y = (v) => padT + barsH - (v / maxV) * barsH;
+  // um eixo só, em R$ (barras e acumulado são a mesma unidade); desce abaixo de zero se o acumulado ficar negativo
+  const maxV = niceMax(Math.max(1, ...rows.map((r) => Math.max(r.receita, r.despesa + r.invest)), ...accs));
+  const lo = Math.min(0, ...accs);
+  const minV = lo < 0 ? -niceMax(-lo) : 0;
+  const y = (v) => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
   const base = y(0);
-  for (const t of [0, maxV / 2, maxV]) {
-    const yy = y(t).toFixed(1);
-    s += `<line class="c-grid${t === 0 ? ' c-base' : ''}" x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}"/>`;
-    s += `<text class="c-tick" x="${padL - 6}" y="${(+yy + 3.5).toFixed(1)}" text-anchor="end">${num(t, { compact: true })}</text>`;
+  const used = [];
+  for (const t of [0, minV, maxV / 2, maxV]) {
+    if (t === minV && minV === 0) continue;
+    const yy = y(t);
+    if (used.some((u) => Math.abs(u - yy) < 12)) continue;
+    used.push(yy);
+    s += `<line class="c-grid${t === 0 ? ' c-base' : ''}" x1="${padL}" x2="${W - padR}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/>`;
+    s += `<text class="c-tick" x="${padL - 6}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end">${num(t, { compact: true })}</text>`;
   }
   const barW = Math.max(4, Math.min(24, (slot - 2 - Math.max(6, slot * 0.28)) / 2));
   const groupW = barW * 2 + 2;
@@ -99,39 +102,28 @@ export function projectionSVG(rows, width) {
     }
   });
 
-  // ---- faixa do acumulado: escala própria, sempre com o zero ----
-  const laneTop = padT + barsH + gap;
-  const accs = rows.map((r) => r.acc || 0);
-  let lo = Math.min(0, ...accs);
-  let hi = Math.max(0, ...accs);
-  if (hi - lo < 100) hi = lo + 100;
-  const room = (hi - lo) * 0.14;
-  if (lo < 0) lo -= room;
-  if (hi > 0) hi += room;
-  const ya = (v) => laneTop + laneH - ((v - lo) / (hi - lo)) * laneH;
-  const z = ya(0);
-  s += `<text class="c-lane-cap" x="${padL}" y="${(laneTop - 9).toFixed(1)}">Acumulado</text>`;
-  s += `<line class="c-grid c-base" x1="${padL}" x2="${W - padR}" y1="${z.toFixed(1)}" y2="${z.toFixed(1)}"/>`;
-  s += `<text class="c-tick" x="${padL - 6}" y="${(z + 3.5).toFixed(1)}" text-anchor="end">0</text>`;
-  const pts = accs.map((v, i) => [cx(i), ya(v)]);
+  // ---- curva do acumulado, por cima das barras ----
+  // contorno da cor do fundo por baixo da curva e dos pontos: ela "flutua" sobre as barras sem embolar com elas;
+  // abaixo de zero, a curva e os pontos ficam vermelhos
+  const pts = accs.map((v, i) => [cx(i), y(v)]);
   const line = smoothPath(pts);
-  const area = `${line} L${pts[n - 1][0].toFixed(1)},${z.toFixed(1)} L${pts[0][0].toFixed(1)},${z.toFixed(1)} Z`;
   const id = ++uid;
-  s += `<defs><clipPath id="acc-up-${id}"><rect x="0" y="${laneTop - 30}" width="${W}" height="${(z - laneTop + 30).toFixed(1)}"/></clipPath>`;
-  s += `<clipPath id="acc-dn-${id}"><rect x="0" y="${z.toFixed(1)}" width="${W}" height="${(laneTop + laneH + 30 - z).toFixed(1)}"/></clipPath></defs>`;
-  s += `<path class="c-acc-area" clip-path="url(#acc-up-${id})" d="${area}"/>`;
-  s += `<path class="c-acc-area neg" clip-path="url(#acc-dn-${id})" d="${area}"/>`;
-  s += `<path class="c-acc" d="${line}"/>`;
+  const clip = (cls, where) => (minV < 0 ? `<path class="${cls}" clip-path="url(#acc-${where}-${id})" d="${line}"/>` : where === 'up' ? `<path class="${cls}" d="${line}"/>` : '');
+  if (minV < 0)
+    s += `<defs><clipPath id="acc-up-${id}"><rect x="0" y="0" width="${W}" height="${base.toFixed(1)}"/></clipPath><clipPath id="acc-dn-${id}"><rect x="0" y="${base.toFixed(1)}" width="${W}" height="${(H - base).toFixed(1)}"/></clipPath></defs>`;
+  s += `<path class="c-acc-halo" d="${line}"/>`;
+  s += clip('c-acc', 'up') + clip('c-acc neg', 'dn');
   pts.forEach(([px, py], i) => {
-    s += `<g class="c-accdot${i === n - 1 ? ' end' : ''}" data-i="${i}"><circle class="c-ring" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="6"/><circle class="c-dot" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4"/></g>`;
+    const X = px.toFixed(1), Y = py.toFixed(1);
+    s += `<g class="c-accdot${accs[i] < 0 ? ' neg' : ''}" data-i="${i}"><circle class="c-sel" cx="${X}" cy="${Y}" r="10"/><circle class="c-ring" cx="${X}" cy="${Y}" r="6"/><circle class="c-dot" cx="${X}" cy="${Y}" r="4"/></g>`;
   });
   // valor final escrito junto ao último ponto (acima dele, ou abaixo se não couber)
   const [ex, ey] = pts[n - 1];
-  const ly = ey - laneTop > 15 ? ey - 9 : ey + 17;
-  s += `<text class="c-acc-label" x="${(ex - 8).toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="end">${num(accs[n - 1], { compact: true })}</text>`;
+  const ly = ey - 12 < padT - 6 ? ey + 20 : ey - 12;
+  s += `<text class="c-acc-label" x="${(ex + 4).toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="end">${num(accs[n - 1], { compact: true })}</text>`;
 
-  // ---- meses, alertas e áreas de toque (a coluna inteira, nos dois painéis) ----
-  const lab = laneTop + laneH;
+  // ---- meses, alertas e áreas de toque (a coluna inteira) ----
+  const lab = H - padB;
   rows.forEach((r, i) => {
     const x = cx(i).toFixed(1);
     s += `<text class="c-month" x="${x}" y="${lab + 17}" text-anchor="middle">${monthShort(r.mk)}</text>`;
@@ -144,6 +136,6 @@ export function projectionSVG(rows, width) {
     s += `<rect class="c-hit" data-tip="${i}" x="${(padL + i * slot).toFixed(1)}" y="0" width="${slot.toFixed(1)}" height="${H}"/>`;
   });
 
-  const label = 'Projeção mês a mês: barras de entradas e de saídas (despesas mais investimento) e, abaixo, a curva da sobra acumulada.';
+  const label = 'Projeção mês a mês: barras de entradas e de saídas (despesas mais investimento) e a curva da sobra acumulada.';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${label}">${s}</svg>`;
 }
