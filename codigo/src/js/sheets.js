@@ -952,11 +952,11 @@ export function openInstall() {
           ? `<p>Você está usando o Folga pelo link do Claude. Seus dados ficam guardados na sua conta e aparecem em qualquer aparelho em que você abrir o link.</p>
       <h3>Atalho na tela inicial (Android)</h3>
       <ol><li>Abra este link no Chrome.</li><li>Toque no menu <b>⋮</b> e em <b>Adicionar à tela inicial</b>.</li></ol>
-      <p>Para a versão instalável completa (funciona offline e tem o atalho “Novo gasto” ao segurar o ícone), publique a pasta do app num endereço https. O README explica o passo a passo.</p>`
+      <p>Esse atalho usa o ícone do site do Claude. Para ter o ícone do Folga, os atalhos “Novo gasto” e “Importar extrato” ao segurar o ícone e o uso sem internet, instale a versão publicada num endereço próprio (o README explica o passo a passo). Para levar seus dados: aqui, <b>Ajustes → Fazer backup</b>; lá, <b>Ajustes → Restaurar backup</b>.</p>`
           : `<h3>Android (Chrome)</h3>
       <ol><li>Toque no menu <b>⋮</b>.</li><li>Escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li><li>Pronto: o Folga abre como um app, até sem internet.</li></ol>
       <h3>O atalho que muda tudo</h3>
-      <p>Segure o dedo no ícone do Folga: aparecem <b>Novo gasto</b>, <b>Nova receita</b> e <b>Check-in</b>. Arraste “Novo gasto” para a tela inicial e lançar vira coisa de 3 segundos.</p>
+      <p>Segure o dedo no ícone do Folga: aparecem <b>Novo gasto</b>, <b>Importar extrato</b> e <b>Check-in</b>. Arraste “Novo gasto” para a tela inicial e lançar vira coisa de 3 segundos.</p>
       <h3>iPhone (Safari)</h3>
       <ol><li>Toque em <b>Compartilhar</b>.</li><li>Escolha <b>Adicionar à Tela de Início</b>.</li></ol>`
       }

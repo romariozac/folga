@@ -4,6 +4,7 @@ import * as U from './util.js';
 import * as M from './model.js';
 import * as A from './actions.js';
 import * as IM from './importer.js';
+import { readPrints } from './ocr.js';
 import { IC, $, openSheet, sheetHead, vibrate } from './ui.js';
 import { catBrowserHTML, pickCategory } from './catui.js';
 
@@ -13,69 +14,7 @@ const m0 = (v) => money(v, { cents: false });
 const FALLBACK = { despesa: 'outros', receita: 'outras_rec', invest: 'investir' };
 const TYPE_LABEL = { conta: 'extrato da conta', cartao: 'fatura do cartão' };
 
-/** Leitura de prints pelo Claude (só existe quando o app é aberto pelo link do Claude). */
-async function getSampler() {
-  const C = window.claude;
-  if (!C || typeof C.use !== 'function') return null;
-  try {
-    const sample = await C.use('sample');
-    if (!sample) return null;
-    const lim = await sample.limits().catch(() => null);
-    return { sample, lim: lim || {}, images: !!(lim && lim.images) };
-  } catch {
-    return null;
-  }
-}
-
-function suggestPrompt(S, groups) {
-  const cats = S.core.cats
-    .filter((c) => !c.hidden)
-    .map((c) => `${c.id}: ${M.KIND_LABEL[c.kind]} · ${M.catPath(S, c.id)}`)
-    .join('\n');
-  const items = groups
-    .map((g, i) => {
-      const it = g[0];
-      return `${i}: ${it.desc} | ${money(it.amount)} | ${it.kind === 'receita' ? 'receita' : it.refund ? 'estorno' : M.KIND_LABEL[it.kind].toLowerCase()}${it.bankHint ? ' | banco: ' + it.bankHint : ''}`;
-    })
-    .join('\n');
-  return `Você sugere categorias para lançamentos de um extrato ou fatura de banco brasileiro.
-Categorias disponíveis (id: tipo · nome):
-${cats}
-
-Lançamentos (número: descrição | valor | tipo | pista do banco, quando houver):
-${items}
-
-Para cada número, escolha o id de categoria mais provável, do mesmo tipo do lançamento (gasto, receita ou investimento; estorno conta como gasto).
-Use null quando não der para saber com segurança (por exemplo, Pix ou transferência para uma pessoa sem outra pista).
-Responda só com JSON, neste formato: {"0":"restaurante","1":null}`;
-}
-
-function printPrompt() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  return `Você vai ler prints (capturas de tela) de uma fatura de cartão de crédito ou de um extrato de conta de um banco brasileiro.
-Extraia TODOS os lançamentos visíveis, sem inventar nada. Se o mesmo lançamento aparecer em mais de um print (telas sobrepostas), inclua uma vez só.
-Regras:
-- Ignore saldos, totais, subtotais, limites, pagamento mínimo, encargos do resumo, cabeçalhos e a seção de parcelas de "próximas faturas".
-- "data": DD/MM/AAAA. Se o ano não aparecer, use ${y}; se o mês for maior que ${m}, use ${y - 1}.
-- "descricao": como está no print (nome do estabelecimento ou da pessoa).
-- "valor": número em reais com ponto decimal. NEGATIVO quando o dinheiro sai (compras, débitos, Pix enviado, pagamentos feitos) e POSITIVO quando entra (créditos, estornos, Pix recebido, salário, pagamento recebido na fatura).
-- "tipo": "cartao" para fatura de cartão, "conta" para extrato de conta.
-- "banco": o nome do banco, se aparecer; senão "".
-- "total": o total dos lançamentos da fatura, se aparecer escrito (número positivo); senão null.
-Responda só com JSON, neste formato:
-{"tipo":"cartao","banco":"Itaú","total":4729.86,"lancamentos":[{"data":"05/10/${y}","descricao":"IFOOD *IFOOD","valor":-45.90}]}`;
-}
-
-const SAMPLE_ERR = {
-  not_granted: 'O uso do Claude não foi autorizado. Para ler prints, permita quando o app pedir.',
-  rate_limited: 'Muitos pedidos ao Claude agora. Espere um pouco e tente de novo.',
-  image_rejected: 'Uma das imagens não pôde ser lida (formato ou tamanho). Tente outro print.',
-  invalid_json: 'Não consegui entender a resposta. Tente de novo, com prints mais nítidos.',
-  refused: 'O Claude não conseguiu ler essas imagens. Tente outros prints.',
-  session_expired: 'Sua sessão expirou. Entre de novo no Claude e tente outra vez.',
-};
+const MAX_PRINTS = 12;
 
 // Passo a passo por banco (os nomes dos menus mudam de vez em quando).
 const BANK_HELP = {
@@ -117,9 +56,7 @@ export function openImport() {
     more: false,
     bank: 'Nubank',
     errorDetail: '',
-    printer: null,
-    claude: null,
-    suggested: 0,
+    guessed: 0,
     ctl: null,
     loadingMsg: '',
   };
@@ -144,7 +81,7 @@ export function openImport() {
       };
       const rebuild = () => {
         st.items = IM.buildBatch(S(), st.parsed, st.type, st.flip);
-        st.suggested = 0;
+        st.guessed = 0;
         const groups = new Map();
         for (const it of st.items) {
           if (it.status !== 'ask') continue;
@@ -173,7 +110,9 @@ export function openImport() {
           const parsed = await fn();
           if (!parsed.rows.length) {
             st.step = 'source';
-            st.error = 'Não encontrei lançamentos aí. Se o PDF for uma imagem escaneada, não dá para ler: tente o OFX/CSV do banco ou cole o texto.';
+            st.error = /print/.test(parsed.source || '')
+              ? 'Não encontrei lançamentos nesses prints. Use prints nítidos da lista de lançamentos, sem cortar os valores, ou o PDF/OFX/CSV do banco.'
+              : 'Não encontrei lançamentos aí. Se o PDF for uma imagem escaneada, não dá para ler: tente o OFX/CSV do banco ou cole o texto.';
           } else {
             st.parsed = parsed;
             st.source = parsed.source;
@@ -186,12 +125,6 @@ export function openImport() {
           st.step = 'source';
           const msg = String((err && (err.message || err.code)) || err);
           st.errorDetail = msg === 'excel' ? '' : msg;
-          if (err && err.code && SAMPLE_ERR[err.code]) {
-            st.error = SAMPLE_ERR[err.code];
-            st.step = 'source';
-            draw();
-            return;
-          }
           if (err && err.code === 'cancelled') {
             st.step = 'source';
             st.errorDetail = '';
@@ -200,9 +133,11 @@ export function openImport() {
           }
           st.error = msg === 'excel'
             ? 'Esse é um arquivo do Excel, que o app não lê. No site do banco, escolha OFX (ou CSV) na hora de salvar o extrato.'
-            : /pdf/i.test(msg) || /Não carregou/.test(msg)
-              ? 'Não consegui abrir o PDF aqui. Tente o arquivo OFX/CSV do banco, ou copie o texto da fatura e use “Colar o texto”.'
-              : 'Não consegui ler esse arquivo. Tente OFX, CSV, PDF da fatura ou cole o texto.';
+            : /leitor de imagens|vendor\/ocr|imagem inválida|tesseract/i.test(msg)
+              ? 'Não consegui abrir o leitor de prints. Na primeira vez ele precisa de internet para baixar uns 5 MB: confira a conexão e tente de novo. Se continuar, use o PDF, OFX ou CSV do banco.'
+              : /pdf/i.test(msg) || /Não carregou/.test(msg)
+                ? 'Não consegui abrir o PDF aqui. Tente o arquivo OFX/CSV do banco, ou copie o texto da fatura e use “Colar o texto”.'
+                : 'Não consegui ler esse arquivo. Tente OFX, CSV, PDF da fatura ou cole o texto.';
         }
         draw();
       };
@@ -212,8 +147,8 @@ export function openImport() {
         ${st.error ? `<div class="warn-box"><span class="flag-ic crit">!</span><div>${esc(st.error)}${st.errorDetail ? `<details class="tech"><summary>Detalhe técnico</summary><code>${esc(st.errorDetail)}</code></details>` : ''}</div></div>` : ''}
         <label class="imp-drop"><input type="file" accept=".ofx,.ofc,.qfx,.csv,.txt,.pdf,.xls,.xlsx,text/csv,text/plain,application/pdf,application/x-ofx" data-file hidden>
           <span class="imp-ic">📄</span><span><b>Escolher arquivo</b><small>OFX ou CSV do banco, PDF ou CSV da fatura</small></span></label>
-        <label class="imp-drop ${st.printer ? '' : 'off'}" data-print-label><input type="file" accept="image/*" multiple data-print hidden ${st.printer ? '' : 'disabled'}>
-          <span class="imp-ic">📸</span><span><b>Ler prints da fatura ou do extrato</b><small>${st.printer ? `Até ${st.printer.lim.images.maxCount} imagens: o Claude lê e o app categoriza` : 'Funciona quando o app é aberto pelo link do Claude'}</small></span></label>
+        <label class="imp-drop"><input type="file" accept="image/*" multiple data-print hidden>
+          <span class="imp-ic">📸</span><span><b>Ler prints da fatura ou do extrato</b><small>Até ${MAX_PRINTS} imagens. A leitura é feita no seu celular, sem usar o Claude</small></span></label>
         <button type="button" class="imp-drop" data-paste-open><span class="imp-ic">📋</span><span><b>Colar o texto</b><small>Copie as linhas do extrato ou da fatura e cole</small></span></button>
         <div data-paste hidden class="form">
           <textarea class="dump" data-paste-text placeholder="05/11 IFOOD *IFOOD 45,90&#10;06/11 UBER *TRIP 12,50&#10;07/11 PIX ENVIADO MARIA 150,00 D"></textarea>
@@ -243,18 +178,21 @@ export function openImport() {
           </ul>
           ${checkHTML()}
           ${st.items.some((i) => i.moved) ? `<p class="help">${U.plural(st.items.filter((i) => i.moved).length, 'parcela ou crédito com data antiga entra', 'parcelas ou créditos com data antiga entram')} no mês desta fatura, que é quando você paga.</p>` : ''}
+          ${/print/.test(st.source) ? '<p class="help">Lido dos prints aqui no celular. Confira datas e valores na revisão: dá para mudar o que vier errado.</p>' : ''}
           <p class="card-sub">Eu reconheço estabelecimentos comuns (iFood, Uber, Netflix, postos, farmácias…) e aprendo com as suas respostas: da próxima vez, pergunto menos.</p>
-          ${st.suggested ? `<p class="ok-line">${IC.check} O Claude sugeriu ${U.plural(st.suggested, 'categoria', 'categorias')}. Você confere na revisão.</p>` : ''}
-          ${
-            st.questions.length >= 2 && st.claude
-              ? `<button type="button" class="imp-drop slim" data-suggest><span class="imp-ic">✨</span><span><b>Pedir sugestões ao Claude</b><small>Ele categoriza as ${st.questions.length} dúvidas de uma vez; o que ele não souber, eu pergunto</small></span></button>`
-              : ''
-          }
+          ${st.guessed ? `<p class="ok-line">${IC.check} ${U.plural(st.guessed, 'palpite aceito', 'palpites aceitos')}. Você confere na revisão.</p>` : ''}
+          ${guessHTML()}
           <div class="row-btns stick">${
             st.questions.length
               ? `<button type="button" class="btn lime wide" data-go="ask">Responder ${U.plural(st.questions.length, 'pergunta', 'perguntas')}</button>`
               : `<button type="button" class="btn primary wide" data-go="review">Revisar e lançar</button>`
           }</div>`;
+      };
+
+      const guessHTML = () => {
+        const n = st.questions.filter((g) => g[0].guess).length;
+        if (!n) return '';
+        return `<button type="button" class="imp-drop slim" data-guess><span class="imp-ic">✨</span><span><b>${n === 1 ? 'Aceitar meu palpite' : `Aceitar meus ${n} palpites`}</b><small>Escolho a categoria mais provável ${n === 1 ? 'de 1 dúvida' : `de ${n} dúvidas`} (pelo seu histórico e pelo nome da loja); você confere na revisão</small></span></button>`;
       };
 
       const checkHTML = () => {
@@ -265,25 +203,26 @@ export function openImport() {
           (i) => (i.dir === 'out' ? i.amount : -i.amount)
         );
         const diff = read - chk.total;
-        return Math.abs(diff) <= 1
-          ? `<p class="ok-line">${IC.check} Conferido: a soma bate com o ${esc(chk.label.toLowerCase())} (${money(chk.total)}).</p>`
-          : `<div class="warn-box"><span class="flag-ic crit">!</span><div>A soma lida (${money(read)}) é diferente do ${esc(chk.label.toLowerCase())} (${money(chk.total)}): ${money(Math.abs(diff))} ${diff < 0 ? 'a menos' : 'a mais'}. Confira os lançamentos antes de lançar.</div></div>`;
+        if (Math.abs(diff) <= 1) return `<p class="ok-line">${IC.check} Conferido: a soma bate com o ${esc(chk.label.toLowerCase())} (${money(chk.total)}).</p>`;
+        if (/print/.test(st.source))
+          return `<div class="warn-box"><span class="flag-ic crit">!</span><div>A soma dos prints (${money(read)}) não bate com o total da fatura (${money(chk.total)}): ${diff < 0 ? `faltam ${money(-diff)}. Se algum lançamento ficou fora dos prints, tire print do resto e leia todos juntos.` : `sobram ${money(diff)}. Confira se algum valor foi lido errado.`}</div></div>`;
+        return `<div class="warn-box"><span class="flag-ic crit">!</span><div>A soma lida (${money(read)}) é diferente do ${esc(chk.label.toLowerCase())} (${money(chk.total)}): ${money(Math.abs(diff))} ${diff < 0 ? 'a menos' : 'a mais'}. Confira os lançamentos antes de lançar.</div></div>`;
       };
 
       const askHTML = () => {
         const group = st.questions[st.qi];
         const it = group[0];
         const total = U.sum(group, (i) => i.amount);
-        const sugg = IM.suggestionsFor(S(), it.kind, it.kind === 'despesa' && /\b(pix|ted|doc|transf)/.test(it.nd) ? ['outros'] : []);
+        const sugg = IM.suggestionsFor(S(), it.kind, [...(it.ranked || []), ...(it.kind === 'despesa' && /\b(pix|ted|doc|transf)/.test(it.nd) ? ['outros'] : [])]);
         const title = it.kind === 'receita' ? 'Que dinheiro é esse?' : it.refund ? 'Estorno ou crédito: de qual categoria?' : it.kind === 'invest' ? 'Para onde foi?' : 'Em que categoria entra?';
         const skip = it.kind === 'receita' ? 'Não é receita (transferência minha)' : 'Não lançar (transferência minha)';
         return `<header class="sheet-head"><div><p class="eyebrow">Pergunta ${st.qi + 1} de ${st.questions.length}</p><h2>${title}</h2></div><button class="icon-btn" data-sheet-close aria-label="Fechar">${IC.close}</button></header>
           <div class="steps">${st.questions.map((_, i) => `<i class="${i <= st.qi ? 'on' : ''}"></i>`).slice(0, 24).join('')}</div>
           <div class="q-card">
             <p class="q-desc">${esc(it.desc)}</p>
-            <p class="q-meta"><b class="${it.kind === 'receita' ? 'pos' : ''}">${it.kind === 'receita' || it.refund ? '+' : '−'}${money(it.amount)}</b> · ${U.dayLabel(it.date)}${group.length > 1 ? ` · e mais ${group.length - 1} igual${group.length > 2 ? 'is' : ''} (${m0(total)} no total)` : ''}</p>
+            <p class="q-meta"><b class="${it.kind === 'receita' ? 'pos' : ''}">${it.kind === 'receita' || it.refund ? '+' : '−'}${money(it.amount)}</b> · ${U.dayLabel(it.date)}${group.length > 1 ? ` · e mais ${group.length - 1} igual${group.length > 2 ? 'is' : ''} (${m0(total)} no total)` : ''}${it.bankHint ? ` · no banco: ${esc(it.bankHint)}` : ''}</p>
           </div>
-          <div class="q-opts">${sugg.map((c) => `<button type="button" class="q-opt" data-qcat="${c.id}"><span class="emo">${c.emoji}</span><span>${esc(c.name)}</span></button>`).join('')}</div>
+          <div class="q-opts">${sugg.map((c) => `<button type="button" class="q-opt${c.id === it.guess ? ' guess' : ''}" data-qcat="${c.id}"><span class="emo">${c.emoji}</span><span>${esc(c.name)}${c.id === it.guess ? '<small>palpite</small>' : ''}</span></button>`).join('')}</div>
           <div class="search"><input type="search" placeholder="Outra categoria: buscar…" data-qsearch value="${esc(st.q)}" aria-label="Buscar categoria"></div>
           <div class="cat-browser" data-qlist ${st.more || st.q ? '' : 'hidden'}>${catBrowserHTML(it.kind, st.q, 'data-qcat')}</div>
           ${st.more || st.q ? '' : '<button type="button" class="link" data-qmore>Ver todas as categorias</button>'}
@@ -300,7 +239,7 @@ export function openImport() {
         const sign = it.kind === 'receita' || it.refund ? '+' : '−';
         return `<li><button type="button" class="tx" data-change="${i}">
           <span class="emo">${c.emoji}</span>
-          <span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)} · ${esc(c.name)}${it.billName ? ` · conta “${esc(it.billName)}”` : ''}${it.refund ? ' · estorno' : ''}${it.parc ? ' · parcela' : ''}${it.how === 'claude' ? ' · sugestão do Claude' : it.how === 'banco' ? ' · categoria do banco' : ''}${extra}</small></span>
+          <span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)} · ${esc(c.name)}${it.billName ? ` · conta “${esc(it.billName)}”` : ''}${it.refund ? ' · estorno' : ''}${it.parc ? ' · parcela' : ''}${it.how === 'palpite' ? ' · palpite' : it.how === 'banco' ? ' · categoria do banco' : ''}${extra}</small></span>
           <span class="tx-amt ${it.kind === 'receita' || it.refund ? 'k-receita' : ''}">${sign}${money(it.amount)}</span></button></li>`;
       };
 
@@ -339,7 +278,7 @@ export function openImport() {
 
       const draw = () => {
         if (st.step === 'loading')
-          box.innerHTML = `${sheetHead('Lendo…')}<div class="splash small"><span class="brand-mark big">f</span><p>${esc(st.loadingMsg)}</p>${st.ctl ? '<button type="button" class="btn ghost" data-stop>Parar</button>' : ''}</div>`;
+          box.innerHTML = `${sheetHead('Lendo…')}<div class="splash small"><span class="brand-mark big">f</span><p data-loading-msg>${esc(st.loadingMsg)}</p>${st.ctl ? '<button type="button" class="btn ghost" data-stop>Parar</button>' : ''}</div>`;
         else if (st.step === 'found') box.innerHTML = foundHTML();
         else if (st.step === 'ask') box.innerHTML = askHTML();
         else if (st.step === 'review') box.innerHTML = reviewHTML();
@@ -369,28 +308,23 @@ export function openImport() {
           const f = e.target.files[0];
           load(() => IM.readStatement(f));
         }
-        if (e.target.matches('[data-print]') && e.target.files.length && st.printer) {
-          const files = [...e.target.files].slice(0, st.printer.lim.images.maxCount);
+        if (e.target.matches('[data-print]') && e.target.files.length) {
+          const files = [...e.target.files].slice(0, MAX_PRINTS);
           e.target.value = '';
           const ctl = new AbortController();
           st.ctl = ctl;
+          const status = (m) => {
+            st.loadingMsg = m;
+            const p = $('[data-loading-msg]', box);
+            if (p) p.textContent = m;
+          };
           load(async () => {
             try {
-              const data = await st.printer.sample.json(printPrompt(), { images: files, signal: ctl.signal, cache: false });
-              const list = Array.isArray(data) ? data : (data && data.lancamentos) || [];
-              const total = data && typeof data.total === 'number' && data.total > 0 ? Math.round(data.total * 100) : null;
-              return {
-                rows: IM.rowsFromList(list),
-                type: data && data.tipo === 'conta' ? 'conta' : 'cartao',
-                conv: 'neg-out',
-                bank: (data && typeof data.banco === 'string' && data.banco.slice(0, 30)) || '',
-                check: total ? { label: 'Total informado no print', total } : null,
-                source: U.plural(files.length, 'print', 'prints'),
-              };
+              return await readPrints(files, { signal: ctl.signal, onStatus: status });
             } finally {
               st.ctl = null;
             }
-          }, 'O Claude está lendo os prints… pode levar até um minuto.');
+          }, 'Preparando o leitor de prints…');
         }
         if (e.target.matches('[data-learn]')) st.learnOn = e.target.checked;
         if (e.target.matches('[data-replace]')) st.replace = e.target.checked;
@@ -405,44 +339,22 @@ export function openImport() {
       });
       el.addEventListener('click', async (e) => {
         const t = (sel) => e.target.closest(sel);
-        if (t('[data-suggest]') && st.claude) {
-          const groups = st.questions.slice(0, 80);
-          const ctl = new AbortController();
-          st.ctl = ctl;
-          const back = st.step;
-          st.step = 'loading';
-          st.loadingMsg = 'O Claude está sugerindo as categorias…';
-          draw();
-          try {
-            const map = await st.claude.sample.json(suggestPrompt(S(), groups), { modelTier: 'quick', signal: ctl.signal, cache: false });
-            let n = 0;
-            groups.forEach((g, i) => {
-              const id = map && map[String(i)];
-              const cat = id && S().core.cats.find((c) => c.id === id && !c.hidden);
-              if (!cat || cat.kind !== g[0].kind) return;
-              for (const it of g) Object.assign(it, { cat: cat.id, status: 'add', how: 'claude' });
-              if (g[0].key) st.learned.set(`${g[0].kind}:${g[0].key}`, cat.id);
-              n++;
-            });
-            st.suggested = n;
-            regroup();
-          } catch (err) {
-            st.error = (err && SAMPLE_ERR[err.code]) || (err && err.code === 'cancelled' ? '' : 'O Claude não conseguiu sugerir agora. Você pode responder as perguntas normalmente.');
-          } finally {
-            st.ctl = null;
-            st.step = back;
-            draw();
+        if (t('[data-guess]')) {
+          let n = 0;
+          for (const g of st.questions) {
+            const cat = g[0].guess;
+            if (!cat) continue;
+            for (const it of g) Object.assign(it, { cat, status: 'add', how: 'palpite' });
+            n++;
           }
+          st.guessed += n;
+          regroup();
+          vibrate(8);
+          draw();
           return;
         }
         if (t('[data-stop]')) {
           if (st.ctl) st.ctl.abort();
-          return;
-        }
-        if (t('[data-print-label]') && !st.printer) {
-          st.error = 'A leitura de prints usa o Claude e só funciona quando o app é aberto pelo link do Claude (claude.ai). No arquivo baixado, use o PDF ou “Colar o texto”.';
-          st.errorDetail = '';
-          draw();
           return;
         }
         if (t('[data-paste-open]')) {
@@ -542,11 +454,6 @@ export function openImport() {
         }
       });
       draw();
-      getSampler().then((p) => {
-        st.claude = p;
-        st.printer = p && p.images ? p : null;
-        if (st.step === 'source' || st.step === 'found') draw();
-      });
     },
   });
 }

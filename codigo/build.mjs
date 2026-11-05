@@ -35,8 +35,8 @@ const version = Date.now().toString(36);
 fs.writeFileSync(path.join(out, 'sw.js'), fs.readFileSync(src('sw.js'), 'utf8').replace('__VERSION__', version));
 fs.copyFileSync(src('manifest.webmanifest'), path.join(out, 'manifest.webmanifest'));
 for (const f of fs.readdirSync(src('icons'))) fs.copyFileSync(src('icons/' + f), path.join(out, 'icons', f));
-fs.mkdirSync(path.join(out, 'vendor'), { recursive: true });
-for (const f of fs.readdirSync(src('vendor'))) fs.copyFileSync(src('vendor/' + f), path.join(out, 'vendor', f));
+// vendor/: leitor de PDF (pdf.js) e, em vendor/ocr/, o leitor de prints (Tesseract.js)
+fs.cpSync(src('vendor'), path.join(out, 'vendor'), { recursive: true });
 fs.copyFileSync(src('fonts/OFL-LICENSE.txt'), path.join(out, 'FONT-LICENSE.txt'));
 
 console.log(`dist/index.html ${(html.length / 1024).toFixed(0)} KB · versão ${version}`);

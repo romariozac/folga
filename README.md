@@ -32,10 +32,11 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 
 Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
 
-- **Formatos:** OFX (Itaú, Bradesco, BB, Santander, Caixa, Inter e outros), CSV (Nubank e outros), **PDF da fatura**
-  ou **texto colado** (copie as linhas do extrato e cole).
-- **Categoriza sozinho**, nesta ordem: regras que aprendeu com você → seu histórico → estabelecimentos conhecidos
-  (iFood, Uber, Netflix, postos, farmácias, supermercados, concessionárias de luz e água…).
+- **Formatos:** OFX (Itaú, Bradesco, BB, Santander, Caixa, Inter e outros), CSV (Nubank e outros), **PDF da fatura**,
+  **prints (fotos da tela)** ou **texto colado** (copie as linhas do extrato e cole).
+- **Categoriza sozinho**, nesta ordem: regras que aprendeu com você → seu histórico → mais de mil lojas e serviços
+  conhecidos (iFood, Uber, Netflix, Drogasil, Assaí, postos, concessionárias de luz e água…), inclusive abreviados
+  como na fatura (“SUPERM BOM PRECO”, “PANIF ESTRELA”, “RAIA123”).
 - **Pergunta só o que ficar em dúvida**, uma pergunta por vez (ex.: “PIX ENVIADO MARIA SILVA, R$ 150: em que categoria entra?”).
   A resposta fica guardada: da próxima vez, “Maria Silva” já entra como *Diarista*, sem perguntar.
 - **Não conta duas vezes:** ignora o pagamento da fatura no extrato do banco (os gastos entram pela própria fatura),
@@ -49,12 +50,18 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
   “próximas faturas”.
 - **Categoria do banco:** quando a fatura imprime a categoria embaixo da compra (supermercado, restaurante, saúde…),
   ela vira pista para categorizar.
-- **Prints:** pelo link do Claude, dá para importar *prints* da fatura ou do extrato. O Claude lê as imagens e o app
-  categoriza (na primeira vez, o Claude pede sua permissão).
-- **Sugestões do Claude:** pelo link do Claude, o botão “Pedir sugestões ao Claude” categoriza de uma vez os
-  estabelecimentos que o app não conhece; você confere na revisão e as respostas viram regras.
-- Se o PDF não abrir, a mensagem traz um “Detalhe técnico” com o motivo. Prefira sempre o link do Claude ao arquivo
-  baixado: o arquivo baixado não recebe atualizações nem sincroniza.
+- **Prints, lidos no próprio celular:** escolha até 12 prints da fatura ou do extrato. A leitura (OCR, com o
+  Tesseract) roda no aparelho: **não usa o Claude** nem gasta seus tokens, e a imagem não vai para lugar nenhum. Na
+  primeira vez ele baixa uns 5 MB; depois funciona até sem internet. Entende cabeçalhos de data (“Hoje”, “Ontem”,
+  “Seg, 3 de novembro”), modo escuro, valor em verde como entrada, compra em dólar e prints que se repetem em parte
+  (o item que aparece em dois prints entra uma vez só). Dica: print da lista de lançamentos, sem cortar os valores,
+  e vários prints de uma vez. Confira datas e valores na revisão.
+- **Palpites, sem o Claude:** o que sobrar de dúvida vem com a categoria mais provável destacada, pelo seu histórico
+  (“Josefa Araujo Silva” parecido com “Josefa Araujo”), por palavras cortadas (“FARMA ZE” → Farmácia) e pela categoria
+  que o banco mostra. O botão **Aceitar meus palpites** resolve de uma vez; você confere na revisão. Pix para pessoas
+  novas continua sendo perguntado.
+- Se o PDF não abrir, a mensagem traz um “Detalhe técnico” com o motivo. Evite o arquivo baixado (aberto direto do
+  celular): ele não recebe atualizações. Use o link do Claude ou o app instalado.
 
 ### Itaú, Caixa, Santander e Nubank
 
@@ -111,22 +118,23 @@ No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito 
 
 **Opção 1: pelo link do Claude (já funciona).** Abra o link do artefato no Chrome e use
 *⋮ → Adicionar à tela inicial*. Seus dados ficam guardados na sua conta Claude, privados, e aparecem em
-qualquer aparelho em que você abrir o link.
+qualquer aparelho em que você abrir o link. O atalho criado assim usa o ícone do site do Claude, não o do Folga.
 
-**Opção 2: como app instalável completo (offline + atalhos).** O app fica publicado pelo GitHub Pages em
-<https://romariozac.github.io/folga/>. Abra esse endereço no Chrome do celular e toque em *⋮ → Instalar app*.
-Segure o dedo no ícone do Folga para ver os atalhos **Novo gasto**, **Importar extrato** e **Check-in**; arraste
-“Novo gasto” para a tela inicial e lançar vira coisa de 3 segundos.
+**Opção 2: como app instalável completo (ícone do Folga, offline e atalhos).** O app fica publicado pelo
+GitHub Pages em <https://romariozac.github.io/folga/>. Abra esse endereço no Chrome do celular e toque em
+*⋮ → Instalar app*. Segure o dedo no ícone do Folga para ver os atalhos **Novo gasto**, **Importar extrato** e
+**Check-in**; arraste “Novo gasto” para a tela inicial e lançar vira coisa de 3 segundos.
 
-Nesta opção os dados ficam só no celular (sem sincronizar com a conta do Claude) e a leitura de prints e as
-sugestões do Claude não estão disponíveis. Para levar os dados do link do Claude: lá, *Ajustes → Fazer backup*;
-aqui, *Ajustes → Restaurar backup*. Faça backups de vez em quando.
+Tudo funciona igual ao link do Claude (inclusive prints e palpites), com uma diferença: os dados ficam só no
+celular, sem sincronizar com a conta do Claude. Para levar o que você já lançou: no link do Claude,
+*Ajustes → Fazer backup*; no app instalado, *Ajustes → Restaurar backup*. Depois, faça backups de vez em quando.
 
 ## Dados e privacidade
 
 - Nada é conectado ao seu banco: você lança e o app planeja.
 - No link do Claude, os dados ficam na área privada da sua conta (nem o dono do artefato vê os dados de outra pessoa).
 - No app instalado, os dados ficam no navegador do celular. Há backup/restauração em `.json` e exportação em `.csv`.
+- Prints, PDFs e extratos são lidos no próprio aparelho. O app não usa o Claude para ler nem para categorizar.
 
 ## Para desenvolver
 
@@ -137,9 +145,10 @@ cd codigo && npm install && node build.mjs
 ```
 
 O build gera `codigo/dist/` com o `index.html` (CSS, JS e a fonte Bricolage Grotesque embutidos, licença OFL),
-`vendor/` com o pdf.js (licença Apache 2.0, carregado só ao importar PDF), `sw.js` (offline),
-`manifest.webmanifest` (instalação e atalhos) e os ícones. Para publicar uma nova versão, copie o conteúdo de
-`codigo/dist/` para a raiz do repositório.
+`vendor/` com o pdf.js (licença Apache 2.0, carregado só ao importar PDF), `vendor/ocr/` com o leitor de prints
+(Tesseract.js 7 e o idioma português, licença Apache 2.0, carregado só ao ler prints; detalhes e a pequena correção
+feita no `worker.min.js` em `vendor/ocr/OCR-LICENSE.txt`), `sw.js` (offline), `manifest.webmanifest` (instalação e
+atalhos) e os ícones. Para publicar uma nova versão, copie o conteúdo de `codigo/dist/` para a raiz do repositório.
 
 ```
 codigo/src/
@@ -150,8 +159,11 @@ codigo/src/
     sheets.js   lançamento rápido, acerto, check-in, editor do plano, ajustes, assistente
     actions.js  operações (lançar, marcar conta, check-in, importar, automático) e exportações
     model.js    plano, projeção, previsto x realizado, categorias em 2 níveis, busca e sugestão
-    importer.js leitura de OFX/CSV/PDF/texto, categorização, duplicados e contas do plano
-    importui.js telas da importação (perguntas e revisão)
+    importer.js leitura de OFX/CSV/PDF/texto, categorização, palpites, duplicados e contas do plano
+    importui.js telas da importação (perguntas, palpites e revisão)
+    ocr.js      leitura de prints no aparelho (Tesseract.js: prepara a imagem, lê palavras e cores)
+    screen.js   transforma as palavras do print em lançamentos (linhas, itens, datas, entrada ou saída)
+    merchants.js lojas e serviços conhecidos → categoria
     catui.js    busca de categorias, seletor em 2 níveis, tela de atalhos
     game.js     XP, níveis, semanas em dia, medalhas
     store.js    localStorage + sincronização com a conta (quando aberto no Claude)
@@ -164,7 +176,6 @@ codigo/src/
 - Modo casal (orçamento compartilhado, como em *Casais Inteligentes Enriquecem Juntos*).
 - Lembrete por notificação no dia do check-in.
 - Abrir arquivos direto do app do banco pelo “Compartilhar” do Android (app instalado).
-- Sugestões de categoria com ajuda do Claude para estabelecimentos desconhecidos.
 
 ## Fontes da pesquisa
 

@@ -1,5 +1,6 @@
 // Modelo de dados e cálculos do plano (projeção) e do mês (previsto x realizado).
 import { addMonths, monthDiff, isoDate, sum } from './util.js';
+import { MERCHANTS } from './merchants.js';
 
 export const KIND_LABEL = { despesa: 'Gasto', receita: 'Receita', invest: 'Investimento' };
 export const CORE_VERSION = 2;
@@ -264,7 +265,7 @@ export function searchCats(S, kind, q) {
   for (const c of S.core.cats) {
     if (c.kind !== kind || c.hidden) continue;
     const name = norm(c.name);
-    const kws = norm(c.kw || '').split(',').map((k) => k.trim());
+    const kws = norm(`${c.kw || ''},${(MERCHANTS[c.id] || '').replace(/[*!]/g, '')}`).split(',').map((k) => k.trim()).filter(Boolean);
     const g = c.parent ? norm(catById(S, c.parent).name) : '';
     let score = 0;
     for (const w of words) {
@@ -285,20 +286,41 @@ export function searchCats(S, kind, q) {
     .map((r) => r.c);
 }
 
-/** Índice de frases (nomes + palavras-chave) para reconhecer descrições. */
+/** Índice de frases (nomes + palavras-chave + estabelecimentos conhecidos) para reconhecer descrições. */
 export function buildMatcher(S) {
   const list = [];
+  const seen = new Set();
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const add = (p, c, prefix, boost = 0) => {
+    if (p.length < 2 || seen.has(`${c.id}|${p}|${prefix}`)) return;
+    seen.add(`${c.id}|${p}|${prefix}`);
+    const body = esc(p).replace(/\s+/g, '[^a-z0-9&]+');
+    // "termo*" pega o começo de palavra (abreviações de fatura); os outros pegam a palavra inteira (plural com s).
+    // Número colado no fim vale ("RAIA123", "RENNER512").
+    const re = new RegExp(prefix ? `(^|[^a-z0-9&])${body}` : `(^|[^a-z0-9&])${body}s?($|[^a-z&])`);
+    list.push({ re, len: p.length + boost, cat: c.id, kind: c.kind, sub: !!c.parent });
+  };
+  const visible = new Map();
   for (const c of S.core.cats) {
     if (c.hidden) continue;
-    const phrases = new Set([norm(c.name)]);
-    for (const p of (c.kw || '').split(',')) {
-      const n = norm(p).trim();
-      if (n.length >= 2) phrases.add(n);
+    visible.set(c.id, c);
+    add(norm(c.name), c, false);
+    for (const p of (c.kw || '').split(',')) add(norm(p).trim(), c, false);
+  }
+  for (const [id, str] of Object.entries(MERCHANTS)) {
+    // categoria escondida ou apagada: o estabelecimento vai para o grupo dela
+    let c = visible.get(id);
+    if (!c) {
+      const d = DEFAULT_CATS.find((x) => x.id === id);
+      c = d && d.parent ? visible.get(d.parent) : null;
     }
-    for (const p of phrases) {
-      if (p.length < 2) continue;
-      list.push({ re: new RegExp(`(^|[^a-z0-9&])${esc(p).replace(/\s+/g, '[^a-z0-9&]+')}s?($|[^a-z0-9&])`), len: p.length, cat: c.id, kind: c.kind, sub: !!c.parent });
+    if (!c) continue;
+    for (const raw of str.split(',')) {
+      // "termo!" = vale mais que qualquer outra palavra da descrição ("IFD*BURGER" é delivery, não restaurante)
+      const t = raw.trim().replace(/!$/, '');
+      const boost = raw.trim().endsWith('!') ? 30 : 0;
+      if (t.endsWith('*')) add(t.slice(0, -1), c, true, boost);
+      else add(t, c, false, boost);
     }
   }
   return list;

@@ -2,6 +2,7 @@
 // (regras aprendidas → histórico → estabelecimentos conhecidos) e separa o que precisa de pergunta.
 import * as U from './util.js';
 import * as M from './model.js';
+import { MERCHANTS } from './merchants.js';
 
 const { norm } = M;
 
@@ -16,7 +17,7 @@ export async function readText(file) {
 }
 
 let pdfLib = null;
-function loadScript(src, ms = 20000) {
+export function loadScript(src, ms = 20000) {
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
     const t = setTimeout(() => reject(new Error('tempo esgotado: ' + src)), ms);
@@ -32,8 +33,9 @@ function loadScript(src, ms = 20000) {
     document.head.appendChild(s);
   });
 }
-// A mesma versão do pdf.js em três lugares. Na pasta local (app instalado) ele usa um Web Worker;
-// nos CDNs, o worker entra como script comum e a leitura roda na própria página.
+// A mesma versão do pdf.js em três lugares. Na pasta local (app instalado e link do Claude, que agora
+// leva os arquivos junto) ele usa um Web Worker; nos CDNs, o worker entra como script comum e a leitura
+// roda na própria página.
 const PDF_SOURCES = [
   { base: 'vendor/', main: false, local: true },
   { base: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/', main: true },
@@ -41,11 +43,10 @@ const PDF_SOURCES = [
 ];
 async function getPdfjs() {
   if (pdfLib) return pdfLib;
-  const inClaude = !!(window.claude && typeof window.claude.use === 'function');
   const httpPage = /^https?:$/.test(location.protocol);
   const list = window.__folgaPdfBase
     ? [{ base: window.__folgaPdfBase, main: !!window.__folgaPdfMain }]
-    : PDF_SOURCES.filter((src) => !(src.local && (inClaude || !httpPage)));
+    : PDF_SOURCES.filter((src) => !(src.local && !httpPage));
   pdfLib = (async () => {
     const errs = [];
     for (const src of list) {
@@ -164,6 +165,11 @@ const BANK_CATS = [
   [/turismo|viage|hotel|hospedag|aere/, 'viagens'],
   [/entreten|lazer|hobby|cinema/, 'lazer'],
   [/pet|veterin/, 'pets'],
+  [/^transporte/, 'transporte'],
+  [/assinatura|streaming/, 'streaming'],
+  [/delivery/, 'delivery'],
+  [/academia|esporte/, 'academia'],
+  [/beleza|estetica|cuidados pessoais/, 'beleza'],
 ];
 export function bankCatToId(word) {
   const n = norm(word);
@@ -441,19 +447,6 @@ export function parseText(text, typeHint = null, hints = null) {
   return { rows, type, conv, check };
 }
 
-/** Lançamentos lidos de prints pelo Claude: [{data, descricao, valor}] com valor negativo = saída. */
-export function rowsFromList(list) {
-  const rows = [];
-  for (const x of Array.isArray(list) ? list : []) {
-    const date = parseDate(String(x.data || x.date || ''));
-    const v = typeof x.valor === 'number' ? x.valor : parseAmount(String(x.valor ?? x.value ?? '')) / 100;
-    const sa = Math.round((Number(v) || 0) * 100);
-    const desc = String(x.descricao || x.description || '').trim();
-    if (date && sa && desc) rows.push({ date, desc, sa });
-  }
-  return rows;
-}
-
 /** Lê um arquivo e devolve as linhas brutas. */
 export async function readStatement(file) {
   const name = (file.name || '').toLowerCase();
@@ -505,6 +498,81 @@ const RESGATE_RE = /\bresgate\b|\bresg\b|\bresgatado\b|\bdinheiro resgatado\b/;
 const INVEST_RE = /\baplic(acao)?\b|\binvest(imento)?\b|\bcdb\b|\btesouro\b|\blci\b|\blca\b|\brdb\b|\bpoupanca\b|\bcaixinha\b|\bcofrinho\b|\bporquinho\b|\bprevidencia\b|\bpgbl\b|\bvgbl\b|\bdinheiro guardado\b|\bguardado\b/;
 const GENERIC_RE = /\b(pix|ted|doc|transf|transferencia|boleto|pagamento|pagseguro|picpay|mercadopago|mp|pag|sumup|stone|cielo|getnet|infinitepay|ton)\b/;
 
+// ---------- palpites (sem internet e sem IA): banco, lançamentos parecidos, começo de palavra ----------
+const tokensOf = (s) => norm(s).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !NOISE.has(w) && !/^\d+$/.test(w));
+
+/** Índices usados pelos palpites: histórico de descrições e palavras-chave para começo de palavra. */
+export function guessContext(S, matcher = M.buildMatcher(S)) {
+  const hist = [];
+  for (const mk of Object.keys(S.months).sort().slice(-12)) {
+    for (const t of S.months[mk].tx) {
+      if (!t.n || t.ap || !t.c) continue;
+      const toks = tokensOf(merchantKey(t.n) || t.n);
+      if (toks.length) hist.push({ kind: t.k, cat: t.c, toks: new Set(toks) });
+    }
+  }
+  // palavras inteiras das palavras-chave (5+ letras), para reconhecer palavras cortadas ("SUPERMER", "FARMAC")
+  const words = new Map();
+  const addWords = (c, str) => {
+    for (const w of norm(str).replace(/\*/g, '').split(/[^a-z0-9]+/)) {
+      if (w.length < 5 || !/^[a-z]+$/.test(w)) continue;
+      const k = `${c.kind}:${w}`;
+      if (!words.has(k)) words.set(k, c.id);
+    }
+  };
+  for (const c of S.core.cats) {
+    if (c.hidden) continue;
+    addWords(c, c.name);
+    addWords(c, c.kw || '');
+    addWords(c, MERCHANTS[c.id] || '');
+  }
+  return { matcher, hist, words };
+}
+
+/** Categorias prováveis para um lançamento em dúvida, da mais para a menos provável. */
+export function rankCats(S, it, ctx = guessContext(S)) {
+  const score = new Map();
+  const bump = (id, v) => {
+    const c = S.core.cats.find((x) => x.id === id && !x.hidden);
+    if (c && c.kind === it.kind) score.set(id, (score.get(id) || 0) + v);
+  };
+  if (it.bankHint && it.kind === 'despesa') {
+    const id = bankCatToId(it.bankHint);
+    if (id) bump(id, 3);
+  }
+  const generic = GENERIC_RE.test(it.nd || norm(it.desc));
+  const toks = tokensOf(it.key || it.desc);
+  if (toks.length) {
+    const votes = new Map();
+    for (const h of ctx.hist) {
+      if (h.kind !== it.kind) continue;
+      const inter = toks.filter((w) => h.toks.has(w)).length;
+      // Pix e transferências: só vale com nome e sobrenome iguais (evita confundir duas Marias)
+      if (!inter || (generic && inter < 2)) continue;
+      const v = inter / Math.max(toks.length, h.toks.size);
+      if (v >= 0.34) votes.set(h.cat, Math.max(votes.get(h.cat) || 0, v));
+    }
+    for (const [id, v] of votes) bump(id, 2.5 * v);
+    // palavra cortada: "SUPERMER" → supermercado, "DROGARIAS" → drogaria
+    for (const w of tokensOf(it.desc)) {
+      if (w.length < 5) continue;
+      for (const [k, id] of ctx.words) {
+        const [kind, kw] = k.split(':');
+        if (kind !== it.kind || kw === w) continue;
+        if ((kw.startsWith(w) && w.length >= 5) || (w.startsWith(kw) && kw.length >= 6)) bump(id, 1.5);
+      }
+    }
+  }
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).map(([id, v]) => ({ id, v }));
+}
+
+/** Palpite seguro o bastante para oferecer de uma vez ("Aceitar palpites"); null se não houver. */
+export function bestGuess(ranked) {
+  if (!ranked.length || ranked[0].v < 1.4) return null;
+  if (ranked[1] && ranked[0].v - ranked[1].v < 0.5) return null;
+  return ranked[0].id;
+}
+
 export function suggestionsFor(S, kind, extra = []) {
   const freq = {};
   for (const mk of Object.keys(S.months).sort().slice(-3)) for (const t of S.months[mk].tx) if (t.k === kind && !t.p && !t.ap) freq[t.c] = (freq[t.c] || 0) + 1;
@@ -512,7 +580,7 @@ export function suggestionsFor(S, kind, extra = []) {
   const ids = [...extra, ...Object.keys(freq).sort((a, b) => freq[b] - freq[a]), ...base];
   const out = [];
   for (const id of ids) {
-    if (out.length >= 4) break;
+    if (out.length >= 6) break;
     const c = S.core.cats.find((x) => x.id === id && x.kind === kind && !x.hidden);
     if (c && !out.includes(c)) out.push(c);
   }
@@ -525,6 +593,7 @@ export function suggestionsFor(S, kind, extra = []) {
  */
 export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = false) {
   const matcher = M.buildMatcher(S);
+  let gctx = null;
   const history = new Map();
   for (const mk of Object.keys(S.months).sort()) {
     for (const t of S.months[mk].tx) {
@@ -554,10 +623,12 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
       r.parc = isParc(r.desc);
       r.moved = true;
     }
-    let out = r.sa < 0;
-    if (parsed.conv === 'pos-out') out = r.sa > 0;
+    // prints: o sinal depende de ser fatura ou extrato ("-" é crédito na fatura e saída no extrato)
+    const sa = r.saBy && r.saBy[type] != null ? r.saBy[type] : r.sa;
+    let out = sa < 0;
+    if (parsed.conv === 'pos-out') out = sa > 0;
     if (flip) out = !out;
-    const amount = Math.abs(r.sa);
+    const amount = Math.abs(sa);
     const desc = r.desc.replace(/\s+/g, ' ').trim().slice(0, 80) || 'Sem descrição';
     const nd = norm(desc);
     const key = merchantKey(desc);
@@ -591,7 +662,12 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
     if (it.kind === 'invest') return { ...it, cat: 'investir', how: 'auto' };
     const bank = r.bankCat && it.kind === 'despesa' ? bankCatToId(r.bankCat) : null;
     if (bank && S.core.cats.some((c) => c.id === bank)) return { ...it, cat: bank, how: 'banco' };
-    return { ...it, status: 'ask', bankHint: r.bankCat || '' };
+    const q = { ...it, status: 'ask', bankHint: r.bankCat || '' };
+    gctx = gctx || guessContext(S, matcher);
+    const ranked = rankCats(S, q, gctx);
+    q.ranked = ranked.slice(0, 6).map((x) => x.id);
+    q.guess = bestGuess(ranked);
+    return q;
   });
 
   // 4) duplicados de lançamentos feitos à mão (mesmo valor, até 3 dias de diferença)
