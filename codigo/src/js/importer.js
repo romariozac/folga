@@ -559,7 +559,8 @@ export function rankCats(S, it, ctx = guessContext(S)) {
       for (const [k, id] of ctx.words) {
         const [kind, kw] = k.split(':');
         if (kind !== it.kind || kw === w) continue;
-        if ((kw.startsWith(w) && w.length >= 5) || (w.startsWith(kw) && kw.length >= 6)) bump(id, 1.5);
+        // palavra cortada ("SUPERMER"), com sobra no fim ("DROGARIAS") ou colada a iniciais ("MP*GDBURGUERS")
+        if ((kw.startsWith(w) && w.length >= 5) || (w.startsWith(kw) && kw.length >= 6) || (w.length >= 7 && kw.length >= 6 && w.includes(kw))) bump(id, 1.5);
       }
     }
   }
@@ -606,6 +607,15 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
   const existing = [];
   for (const mk of Object.keys(S.months)) for (const t of S.months[mk].tx) existing.push({ ...t, mk, used: false });
   const fps = new Set(existing.filter((t) => t.fp).map((t) => t.fp));
+  // já importado antes com a descrição um pouco diferente (o mesmo print lido de novo, outro recorte da tela)
+  const imported = existing.filter((t) => t.im && t.n);
+  const sameDesc = (a, b) => {
+    const A = new Set(tokensOf(a));
+    const B = tokensOf(b);
+    if (!A.size || !B.length) return norm(a).trim() === norm(b).trim();
+    const inter = B.filter((w) => A.has(w)).length;
+    return inter / Math.min(A.size, B.length) >= 0.6;
+  };
   const takenBills = new Set();
 
   // Parcelas (ex.: "LOJA 08/10") aparecem com a data da compra original: contam no mês desta fatura.
@@ -637,6 +647,11 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
 
     // 1) o que não deve virar lançamento
     if (fps.has(fp)) return { ...it, status: 'dup', reason: 'Já importado antes' };
+    const again = imported.find((t) => !t.used && t.d === r.date && Math.abs(t.v) === amount && sameDesc(t.n, desc));
+    if (again) {
+      again.used = true;
+      return { ...it, status: 'dup', reason: 'Já importado antes' };
+    }
     if (type === 'cartao' && !out && (CARD_PAYMENT_RE.test(nd) || /\b(pagamento|pgto|pagto)\b/.test(nd))) return { ...it, status: 'ignore', reason: 'Pagamento da fatura' };
     if (type !== 'cartao' && out && FATURA_RE.test(nd)) return { ...it, status: 'ignore', reason: 'Pagamento da fatura do cartão: os gastos entram pela própria fatura' };
     if (SWEEP_RE.test(nd) && !(!out && REND_RE.test(nd))) return { ...it, status: 'ignore', reason: 'Aplicação ou resgate automático do banco (o dinheiro continua disponível)' };

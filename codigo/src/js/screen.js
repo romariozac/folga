@@ -29,9 +29,13 @@ const WD_IDX = { dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6 };
 export function headerDate(text, today = U.isoDate()) {
   const s = norm(text).replace(/[|•·]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[.,:;-]+$/, '');
   if (!s || s.length > 48) return null;
-  if (/^hoje\b/.test(s) && s.length <= 14) return today;
-  if (/^ontem\b/.test(s) && s.length <= 15) return U.addDays(today, -1);
-  if (/^anteontem\b/.test(s) && s.length <= 18) return U.addDays(today, -2);
+  const onlyDate = (r) => (/^\d{1,2}(?:[/.-]\d{1,2}(?:[/.-]\d{2,4})?|\s*(?:de\s+)?[a-z]{3,9}\.?(?:\s*(?:de\s+)?\d{4})?)$/.test(r) ? parseDate(r) : null);
+  // "Hoje", "Ontem, 4 de novembro": a data escrita vale mais (o print pode ser de outro dia)
+  const rel = s.match(/^(hoje|ontem|anteontem)\b[\s,.-]*(.*)$/);
+  if (rel) {
+    if (!rel[2]) return rel[1] === 'hoje' ? today : U.addDays(today, rel[1] === 'ontem' ? -1 : -2);
+    return onlyDate(rel[2].replace(WEEKDAY, '').trim());
+  }
   const wd = s.match(WEEKDAY);
   const rest = (wd ? s.slice(wd[0].length) : s).replace(/^[,.\s-]+/, '').trim();
   if (!rest) {
@@ -43,8 +47,7 @@ export function headerDate(text, today = U.isoDate()) {
     }
     return null;
   }
-  if (!/^\d{1,2}(?:[/.-]\d{1,2}(?:[/.-]\d{2,4})?|\s*(?:de\s+)?[a-z]{3,9}\.?(?:\s*(?:de\s+)?\d{4})?)$/.test(rest)) return null;
-  return parseDate(rest);
+  return onlyDate(rest);
 }
 
 // rótulos que não são lançamento (saldo, limite, totais, datas de fatura)
@@ -185,6 +188,9 @@ function fixLeadDay(text) {
 // rótulo de categoria que o app do banco mostra embaixo da compra ("Serviços", "Transporte")
 const BANK_LABEL = /^(servicos|transporte|compras|outros|lazer|saude|educacao|viage(m|ns)|mercado|alimentacao|restaurantes?|supermercados?|vestuario|casa|eletronicos|posto|combustivel|pets?|beleza|farmacia|entretenimento|assinaturas?|academia|moradia|delivery|cuidados pessoais)$/;
 
+// forma de pagamento mostrada em cima do nome da loja: não ajuda a categorizar
+const WALLET = /^((android|google|apple|samsung|garmin|mercado|pic) ?pay|aproximacao|contactless|cartao (virtual|fisico|adicional)|carteira digital)$/;
+
 const letters = (s) => (s.match(/\p{L}/gu) || []).length;
 const isJunkLine = (s) => !s || letters(s) < 2 || /^(cartao|final|cart)\b.*\d{4}$/i.test(norm(s)) || /^\d+$/.test(s.replace(/\s/g, ''));
 
@@ -203,6 +209,18 @@ export function parseScreens(pages) {
     // onde ficam os valores nesta tela (borda direita): ajuda a recuperar "23/10" que era "23,10"
     const amtRight = median((pg.words || []).filter((w) => /\d,\d{2}(?!\d)/.test(fixOcrText(w.t))).map((w) => w.x1), null);
     const pageW = pg.w || Math.max(1, ...(pg.words || []).map((w) => w.x1));
+    for (const r of rows) {
+      // ícone à esquerda lido como letra: palavra curta, sem número, longe da palavra seguinte
+      const [w0, w1] = r.words;
+      const n0 = norm(w0.t);
+      if (!w1 || w0.t.length > 3 || /\d/.test(w0.t) || /^[-+]+$/.test(w0.t) || dayOf(w0.t) || MONTHS.test(n0) || /^(seg|ter|qua|qui|sex|sab|dom)\.?$/.test(n0) || !/^\p{L}/u.test(w1.t)) continue;
+      const hh = median(r.words.slice(1).map((w) => w.y1 - w.y0), w1.y1 - w1.y0);
+      if (w1.x0 - w0.x1 > 0.9 * hh) {
+        r.words.shift();
+        r.text = r.words.map((w) => w.t).join(' ');
+        r.x0 = r.words[0].x0;
+      }
+    }
     rows.forEach((r, i) => {
       r.gapAbove = i ? r.y0 - rows[i - 1].y1 : Infinity;
       r.gapBelow = i < rows.length - 1 ? rows[i + 1].y0 - r.y1 : Infinity;
@@ -257,7 +275,7 @@ export function parseScreens(pages) {
             if (!date && d.lead) date = parseDate(d.lead);
             let s = cleanDesc(d);
             if (sd && sd.rows.includes(d)) s = s.replace(/^\S+\s*/, '');
-            if (isJunkLine(s)) continue;
+            if (isJunkLine(s) || WALLET.test(norm(s))) continue;
             if (many && /^\p{L}{1,3}$/u.test(s) && letters(s) <= 3 && descRows.length > 1 && d !== a) continue;
             if (parts.length && s.split(' ').length <= 2 && (bankCatToId(s) || BANK_LABEL.test(norm(s)))) {
               bankCat = bankCat || s;
@@ -314,15 +332,16 @@ export function parseScreens(pages) {
 
   // prints em sequência costumam repetir itens (a tela rola e sobra um pedaço): fica um só
   const keep = [];
+  const when = (x) => x.date || x.ctxDate || null;
   for (const it of items) {
-    const prev = keep.filter((k) => k.page === it.page - 1 && !k.matched && k.amount === it.amount);
+    const prev = keep.filter((k) => k.page < it.page && !k.matched && k.amount === it.amount && (k.page === it.page - 1 || (when(k) && when(k) === when(it))));
     const twin = prev.find((k) => {
-      if (k.date && it.date && k.date !== it.date) return false;
+      if (when(k) && when(it) && when(k) !== when(it)) return false;
       const a = new Set(k.nd.split(' ').filter((w) => w.length > 2));
       const b = it.nd.split(' ').filter((w) => w.length > 2);
       const inter = b.filter((w) => a.has(w)).length;
       const sim = inter / Math.max(1, Math.min(a.size, b.length));
-      const edge = it.h && k.h ? it.y < it.h * 0.25 && k.y > k.h * 0.5 : false;
+      const edge = k.page === it.page - 1 && it.h && k.h ? it.y < it.h * 0.25 && k.y > k.h * 0.5 : false;
       return sim >= 0.5 || k.nd.includes(it.nd) || it.nd.includes(k.nd) || edge;
     });
     if (twin) {

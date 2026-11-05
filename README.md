@@ -40,7 +40,9 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
 - **Pergunta só o que ficar em dúvida**, uma pergunta por vez (ex.: “PIX ENVIADO MARIA SILVA, R$ 150: em que categoria entra?”).
   A resposta fica guardada: da próxima vez, “Maria Silva” já entra como *Diarista*, sem perguntar.
 - **Não conta duas vezes:** ignora o pagamento da fatura no extrato do banco (os gastos entram pela própria fatura),
-  resgates de investimento e transferências entre suas contas; reconhece o que já foi importado e o que você já tinha lançado à mão.
+  resgates de investimento e transferências entre suas contas; reconhece o que já foi importado (inclusive o mesmo
+  print lido de novo, com a descrição um pouco diferente) e o que você já tinha lançado à mão.
+- **Desfazer:** logo depois de importar, o aviso traz o botão **Desfazer** (10 segundos), que apaga a importação inteira.
 - **Marca as contas do plano:** um Pix de R$ 1.500 para a imobiliária marca o “Aluguel” como pago.
 - **Troca os acertos aproximados** daquele período pelos valores reais (você escolhe).
 - Estornos da fatura abatem o gasto da categoria.

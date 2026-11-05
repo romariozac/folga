@@ -5,7 +5,7 @@ import * as M from './model.js';
 import * as A from './actions.js';
 import * as IM from './importer.js';
 import { readPrints } from './ocr.js';
-import { IC, $, openSheet, sheetHead, vibrate } from './ui.js';
+import { IC, $, openSheet, sheetHead, vibrate, toast } from './ui.js';
 import { catBrowserHTML, pickCategory } from './catui.js';
 
 const S = () => ctx.S;
@@ -465,7 +465,21 @@ export function openImport() {
           const res = A.commitImport(st.items, { replaceAcertos: st.replace ? st.acertos : null, learn });
           close();
           ctx.render();
-          A.notify(`Importado: <b>${U.plural(res.count, 'lançamento', 'lançamentos')}</b>${res.out ? ` · gastos ${m0(res.out)}` : ''}${res.inn ? ` · receitas ${m0(res.inn)}` : ''}.`, res.events);
+          A.notify(
+            `Importado: <b>${U.plural(res.count, 'lançamento', 'lançamentos')}</b>${res.out ? ` · gastos ${m0(res.out)}` : ''}${res.inn ? ` · receitas ${m0(res.inn)}` : ''}.`,
+            res.events,
+            res.count
+              ? {
+                  label: 'Desfazer',
+                  fn: () => {
+                    A.undoImport(res);
+                    ctx.render();
+                    toast('Importação desfeita.');
+                  },
+                }
+              : null,
+            10000
+          );
         }
       });
       draw();

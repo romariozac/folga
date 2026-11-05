@@ -25,10 +25,10 @@ export function celebrateEvents(events) {
 }
 
 /** Toast padrão + celebrações. */
-export function notify(msgHtml, events = [], action = null) {
+export function notify(msgHtml, events = [], action = null, ms) {
   const cb = events.find((e) => e.type === 'comeback');
   const msg = cb ? `${msgHtml}<br><small>Que bom te ver de volta! Recomeçar conta.</small>` : msgHtml;
-  toast(msg, { xp: xpOf(events), action });
+  toast(msg, { xp: xpOf(events), action, ...(ms ? { ms } : {}) });
   celebrateEvents(events);
 }
 
@@ -388,10 +388,15 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
   const g = st.core.game;
   const events = [];
   const keys = new Set(['core']);
+  const added = [];
+  const removed = [];
+  const prevRules = [];
+  const xp0 = g.xp;
   if (replaceAcertos && replaceAcertos.list.length) {
     for (const a of replaceAcertos.list) {
       const b = st.months[a.mk];
       if (!b) continue;
+      for (const t of b.tx) if (t.id === a.id) removed.push({ mk: a.mk, t });
       b.tx = b.tx.filter((t) => t.id !== a.id);
       keys.add('m-' + a.mk);
     }
@@ -406,13 +411,17 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
     const t = { id: U.uid() + count, d: it.date, v: it.refund ? -it.amount : it.amount, k: it.kind, c: it.cat, n: it.desc, im: 1, fp: it.fp, t: Date.now() + count };
     if (it.p) t.p = it.p;
     (st.months[mk] ||= { updatedAt: 0, tx: [] }).tx.push(t);
+    added.push({ mk, id: t.id });
     keys.add('m-' + mk);
     count++;
     if (it.kind === 'receita') inn += it.amount;
     else if (it.kind === 'despesa') out += it.refund ? -it.amount : it.amount;
     if (it.kind === 'invest') investMonths.add(mk);
   }
-  for (const r of learn) st.core.rules[r.key] = r.cat;
+  for (const r of learn) {
+    prevRules.push([r.key, st.core.rules[r.key]]);
+    st.core.rules[r.key] = r.cat;
+  }
   if (count) {
     g.totalTx = (g.totalTx || 0) + count;
     G.markActivity(st.core, today(), 'entry', events);
@@ -430,5 +439,30 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
     for (const k of keys) if (k.startsWith('m-')) checkAllBills(k.slice(2), events);
   }
   store.save([...keys]);
-  return { events, count, out, inn };
+  return { events, count, out, inn, undo: { added, removed, prevRules, xp: g.xp - xp0, count } };
+}
+
+/** Desfaz uma importação: tira os lançamentos que ela criou, devolve os acertos trocados e as regras e o XP. */
+export function undoImport(res) {
+  const st = S();
+  const u = res.undo;
+  const keys = new Set(['core']);
+  for (const { mk, id } of u.added) {
+    const b = st.months[mk];
+    if (!b) continue;
+    b.tx = b.tx.filter((t) => t.id !== id);
+    keys.add('m-' + mk);
+  }
+  for (const { mk, t } of u.removed) {
+    (st.months[mk] ||= { updatedAt: 0, tx: [] }).tx.push(t);
+    keys.add('m-' + mk);
+  }
+  for (const [k, v] of u.prevRules) {
+    if (v === undefined) delete st.core.rules[k];
+    else st.core.rules[k] = v;
+  }
+  const g = st.core.game;
+  g.xp = Math.max(0, g.xp - u.xp);
+  g.totalTx = Math.max(0, (g.totalTx || 0) - u.count);
+  store.save([...keys]);
 }
