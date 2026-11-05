@@ -1,5 +1,6 @@
 // Gráfico de projeção (SVG feito à mão): por mês, uma barra de Entradas e uma barra de Saídas
-// (despesas + investimento empilhados). Um único eixo em R$, barras finas com topo arredondado.
+// (despesas + investimento empilhados), e a linha da sobra acumulada mês a mês.
+// Um único eixo em R$ (barras e linha estão na mesma unidade), barras finas com topo arredondado.
 import { num, monthShort } from './util.js';
 
 function niceMax(v) {
@@ -19,30 +20,37 @@ function bar(x, y, w, h, cls, roundTop) {
   return `<path class="${cls}" d="M${X},${B} V${(y + r).toFixed(1)} Q${X},${Y} ${(x + r).toFixed(1)},${Y} H${(x + w - r).toFixed(1)} Q${R},${Y} ${R},${(y + r).toFixed(1)} V${B} Z"/>`;
 }
 
-export function projectionSVG(rows, width, { height = 198 } = {}) {
+export function projectionSVG(rows, width, { height = 210 } = {}) {
   const W = Math.max(260, Math.round(width));
   const H = height;
-  const padL = 34, padR = 2, padT = 8, padB = 46;
+  const padL = 34, padR = 2, padT = 18, padB = 46;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
-  const maxV = niceMax(Math.max(1, ...rows.map((r) => Math.max(r.receita, r.despesa + r.invest))));
-  const y = (v) => padT + plotH - (v / maxV) * plotH;
   const n = rows.length;
+  const accs = rows.map((r) => r.acc || 0);
+  const maxV = niceMax(Math.max(1, ...rows.map((r) => Math.max(r.receita, r.despesa + r.invest)), ...accs));
+  const lo = Math.min(0, ...accs);
+  const minV = lo < 0 ? -niceMax(-lo) : 0;
+  const y = (v) => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
   const slot = plotW / n;
   const barW = Math.max(4, Math.min(24, (slot - 2 - Math.max(6, slot * 0.28)) / 2));
   const groupW = barW * 2 + 2;
+  const base = y(0);
   let s = '';
 
-  // grade recessiva + rótulos do eixo
-  for (const t of [0, maxV / 2, maxV]) {
-    const yy = y(t).toFixed(1);
-    s += `<line class="c-grid${t === 0 ? ' c-base' : ''}" x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}"/>`;
-    s += `<text class="c-tick" x="${padL - 6}" y="${(+yy + 3.5).toFixed(1)}" text-anchor="end">${num(t, { compact: true })}</text>`;
+  // grade recessiva + rótulos do eixo (um rótulo a menos de 12px de outro não entra)
+  const used = [];
+  for (const t of [0, minV, maxV / 2, maxV]) {
+    if (t === minV && minV === 0) continue;
+    const yy = y(t);
+    if (used.some((u) => Math.abs(u - yy) < 12)) continue;
+    used.push(yy);
+    s += `<line class="c-grid${t === 0 ? ' c-base' : ''}" x1="${padL}" x2="${W - padR}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/>`;
+    s += `<text class="c-tick" x="${padL - 6}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end">${num(t, { compact: true })}</text>`;
   }
 
   rows.forEach((r, i) => {
     const x0 = padL + i * slot + (slot - groupW) / 2;
-    const base = y(0);
     s += bar(x0, y(r.receita), barW, base - y(r.receita), 'c-in', true);
     const xs = x0 + barW + 2;
     const hasInv = r.invest > 0;
@@ -54,8 +62,7 @@ export function projectionSVG(rows, width, { height = 198 } = {}) {
       s += bar(xs, top, barW, y(r.despesa) - top - gap, 'c-inv', true);
     }
     const cx = (x0 + groupW / 2).toFixed(1);
-    const mm = monthShort(r.mk);
-    s += `<text class="c-month" x="${cx}" y="${H - padB + 15}" text-anchor="middle">${mm}</text>`;
+    s += `<text class="c-month" x="${cx}" y="${H - padB + 15}" text-anchor="middle">${monthShort(r.mk)}</text>`;
     if (r.mk.endsWith('-01') || i === 0) s += `<text class="c-year" x="${cx}" y="${H - padB + 27}" text-anchor="middle">${r.mk.slice(0, 4)}</text>`;
     if (r.saldo < 0) {
       const wy = H - padB + (r.mk.endsWith('-01') || i === 0 ? 38 : 26);
@@ -64,6 +71,16 @@ export function projectionSVG(rows, width, { height = 198 } = {}) {
     s += `<rect class="c-hit" data-tip="${i}" x="${(padL + i * slot).toFixed(1)}" y="0" width="${slot.toFixed(1)}" height="${H}"/>`;
   });
 
-  const label = 'Projeção mês a mês: barras de entradas e de saídas (despesas mais investimento).';
+  // linha do acumulado: 2px, ponto no fim (com anel da cor do fundo) e o valor final escrito ao lado
+  const pts = rows.map((r, i) => [padL + i * slot + slot / 2, y(r.acc || 0)]);
+  s += `<path class="c-acc" d="M${pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L')}"/>`;
+  pts.forEach(([px, py], i) => {
+    s += `<g class="c-accdot${i === n - 1 ? ' end' : ''}" data-i="${i}"><circle class="c-ring" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="6"/><circle class="c-dot" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4"/></g>`;
+  });
+  const [ex, ey] = pts[n - 1];
+  const ly = ey - 11 < 10 ? ey + 19 : ey - 11;
+  s += `<text class="c-acc-label" x="${(ex + 5).toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="end">${num(rows[n - 1].acc || 0, { compact: true })}</text>`;
+
+  const label = 'Projeção mês a mês: barras de entradas e de saídas (despesas mais investimento) e a linha da sobra acumulada.';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${label}">${s}</svg>`;
 }

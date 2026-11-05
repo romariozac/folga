@@ -6,7 +6,7 @@ import * as A from './actions.js';
 import * as IM from './importer.js';
 import { readPrints } from './ocr.js';
 import { IC, $, openSheet, sheetHead, vibrate, toast } from './ui.js';
-import { catBrowserHTML, pickCategory } from './catui.js';
+import { catBrowserHTML, createFromSearch, pickCategory } from './catui.js';
 
 const S = () => ctx.S;
 const { esc, money } = U;
@@ -232,7 +232,7 @@ export function openImport() {
             <p class="q-meta"><b class="${it.kind === 'receita' ? 'pos' : ''}">${it.kind === 'receita' || it.refund ? '+' : '−'}${money(it.amount)}</b> · ${U.dayLabel(it.date)}${group.length > 1 ? ` · e mais ${group.length - 1} igual${group.length > 2 ? 'is' : ''} (${m0(total)} no total)` : ''}${it.bankHint ? ` · no banco: ${esc(it.bankHint)}` : ''}</p>
           </div>
           <div class="q-opts">${sugg.map((c) => `<button type="button" class="q-opt${c.id === it.guess ? ' guess' : ''}" data-qcat="${c.id}"><span class="emo">${c.emoji}</span><span>${esc(c.name)}${c.id === it.guess ? '<small>palpite</small>' : ''}</span></button>`).join('')}</div>
-          <div class="search"><input type="search" placeholder="Outra categoria: buscar…" data-qsearch value="${esc(st.q)}" aria-label="Buscar categoria"></div>
+          <div class="search"><input type="search" placeholder="Outra categoria: buscar ou criar…" data-qsearch value="${esc(st.q)}" aria-label="Buscar categoria"></div>
           <div class="cat-browser" data-qlist ${st.more || st.q ? '' : 'hidden'}>${catBrowserHTML(it.kind, st.q, 'data-qcat')}</div>
           ${st.more || st.q ? '' : '<button type="button" class="link" data-qmore>Ver todas as categorias</button>'}
           ${it.key ? `<label class="tog inline"><input type="checkbox" data-learn ${st.learnOn ? 'checked' : ''}><span>Lembrar para “${esc(it.key)}” nas próximas importações</span></label>` : ''}
@@ -404,6 +404,14 @@ export function openImport() {
         }
         const qc = t('[data-qcat]');
         if (qc) return answer(qc.dataset.qcat);
+        if (st.step === 'ask') {
+          const nc = createFromSearch(e, st.questions[st.qi][0].kind);
+          if (nc) {
+            const c = await nc;
+            if (c) answer(c.id);
+            return;
+          }
+        }
         if (t('[data-qmore]')) {
           st.more = true;
           draw();

@@ -3,7 +3,8 @@ import { addMonths, monthDiff, isoDate, sum } from './util.js';
 import { MERCHANTS } from './merchants.js';
 
 export const KIND_LABEL = { despesa: 'Gasto', receita: 'Receita', invest: 'Investimento' };
-export const CORE_VERSION = 2;
+// 3: "Metas" virou categoria principal de investimento (cada meta é uma subcategoria dela)
+export const CORE_VERSION = 3;
 
 // Categorias em dois níveis, como na planilha de orçamento doméstico do Cerbasi: grupos
 // (Habitação/Moradia, Transporte, Saúde, Educação, Despesas pessoais, Lazer...) e itens.
@@ -121,7 +122,7 @@ export const DEFAULT_CATS = [
   C('reserva', 'Reserva de emergência', '🛟', I, null, 'reserva, reserva de emergencia'),
   C('investir', 'Investimentos', '🌱', I, null, 'aplicacao, aplic, cdb, tesouro, lci, lca, rdb, fundo, poupanca, caixinha, cofrinho, porquinho, investimento'),
   C('previdencia', 'Previdência', '🧓', I, 'investir', 'previdencia, pgbl, vgbl'),
-  C('sonhos', 'Sonhos e metas', '⭐', I, 'investir', 'meta, sonho'),
+  C('sonhos', 'Metas', '🎯', I, null, 'meta, metas, sonho, sonhos, objetivo'),
 ];
 
 /** Os 9 atalhos padrão da tela de lançar (o resto fica em “Mais”). */
@@ -139,11 +140,14 @@ export function defaultCore() {
       theme: 'auto',
       reserveStart: 0, // quanto já havia na reserva antes do app
       reserveGoalMonths: 6,
+      investStart: 0, // quanto já havia em outros investimentos (fora a reserva e as metas)
       createdAt: isoDate(),
       favs: [...DEFAULT_FAVS],
     },
     cats: DEFAULT_CATS.map((c) => ({ ...c })),
     plan: [],
+    // metas: { id, name, emoji, target, due:'YYYY-MM', saved0, cat, line, created, done? }
+    goals: [],
     rules: {}, // aprendizado da importação: { 'despesa:maria silva': 'diarista' }
     autoSkip: {}, // contas automáticas desmarcadas: { 'linhaId@YYYY-MM': 1 }
     game: {
@@ -191,7 +195,8 @@ const TEMPLATE_REMAP = {
 /** Atualiza dados antigos. Devolve true se mudou algo que precisa ser salvo. */
 export function migrateCore(core) {
   let changed = false;
-  const old = (core.v || 1) < CORE_VERSION;
+  const from = core.v || 1;
+  const old = from < CORE_VERSION;
   for (const d of DEFAULT_CATS) {
     const c = core.cats.find((x) => x.id === d.id);
     if (!c) {
@@ -204,12 +209,18 @@ export function migrateCore(core) {
     }
   }
   if (old) {
-    const parentOf = Object.fromEntries(DEFAULT_CATS.map((c) => [c.id, c.parent || null]));
-    for (const l of core.plan || []) {
-      const to = TEMPLATE_REMAP[l.name];
-      if (to && parentOf[to] === l.cat) l.cat = to;
+    if (from < 2) {
+      const parentOf = Object.fromEntries(DEFAULT_CATS.map((c) => [c.id, c.parent || null]));
+      for (const l of core.plan || []) {
+        const to = TEMPLATE_REMAP[l.name];
+        if (to && parentOf[to] === l.cat) l.cat = to;
+      }
     }
     core.v = CORE_VERSION;
+    changed = true;
+  }
+  if (!Array.isArray(core.goals)) {
+    core.goals = [];
     changed = true;
   }
   if (!Array.isArray(core.settings.favs)) {
@@ -237,6 +248,11 @@ export function groupId(S, id) {
 }
 export const groupsOf = (S, kind) => S.core.cats.filter((c) => c.kind === kind && !c.parent && !c.hidden);
 export const subsOf = (S, gid) => S.core.cats.filter((c) => c.parent === gid && !c.hidden);
+/** Categoria com o mesmo nome (sem acento e sem maiúsculas). parent: undefined = qualquer lugar; null = só grupos. */
+export function catByName(S, kind, name, parent) {
+  const n = norm(name).replace(/\s+/g, ' ').trim();
+  return S.core.cats.find((c) => c.kind === kind && !c.hidden && (parent === undefined || (c.parent || null) === parent) && norm(c.name).replace(/\s+/g, ' ').trim() === n) || null;
+}
 export function catPath(S, id) {
   const c = catById(S, id);
   return c.parent ? `${catById(S, c.parent).name} › ${c.name}` : c.name;
@@ -481,6 +497,85 @@ export function reserveBalance(S) {
   let total = S.core.settings.reserveStart || 0;
   for (const mk in S.months) for (const t of S.months[mk].tx) if (t.c === 'reserva') total += t.v;
   return total;
+}
+
+// ---------- metas e investimentos ----------
+/** Ideias para a primeira meta (só atalhos: nome e valor ficam por conta de quem usa). */
+export const GOAL_IDEAS = [
+  { name: 'Viagem em família', emoji: '✈️' },
+  { name: 'Trocar de carro', emoji: '🚗' },
+  { name: 'Entrada da casa', emoji: '🏠' },
+  { name: 'Casamento', emoji: '💍' },
+  { name: 'Estudos', emoji: '🎓' },
+  { name: 'Celular novo', emoji: '📱' },
+];
+
+/** Arredonda para cima, de R$ 10 em R$ 10 (valores sugeridos por mês). */
+export const roundUp10 = (c) => (c > 0 ? Math.ceil(c / 1000) * 1000 : 0);
+
+/** Total guardado por categoria de investimento, somando todos os meses. */
+export function investByCat(S) {
+  const by = {};
+  for (const mk in S.months) for (const t of S.months[mk].tx) if (t.k === 'invest') by[t.c] = (by[t.c] || 0) + t.v;
+  return by;
+}
+
+export const activeGoals = (S) => (S.core.goals || []).filter((g) => !g.done);
+export const goalById = (S, id) => (S.core.goals || []).find((g) => g.id === id) || null;
+export const goalByCat = (S, cat) => (S.core.goals || []).find((g) => g.cat === cat) || null;
+
+/**
+ * Situação de uma meta no mês mk: guardado, quanto falta, meses até o prazo (contando mk),
+ * quanto guardar por mês para chegar no prazo e quando chega no ritmo planejado.
+ */
+export function goalInfo(S, g, mk, by = investByCat(S)) {
+  const saved = (g.saved0 || 0) + (by[g.cat] || 0);
+  const target = g.target || 0;
+  const left = Math.max(0, target - saved);
+  const reached = target > 0 && saved >= target;
+  const months = g.due ? Math.max(1, monthDiff(mk, g.due) + 1) : null;
+  const line = g.line ? S.core.plan.find((l) => l.id === g.line) || null : null;
+  const planned = line ? line.amount : 0;
+  const need = months ? roundUp10(left / months) : null;
+  const late = !reached && need != null && need > planned + 100;
+  const eta = !reached && planned > 0 ? addMonths(mk, Math.ceil(left / planned) - 1) : null;
+  return { saved, target, left, reached, months, line, planned, need, late, eta, pct: target ? Math.min(1, Math.max(0, saved / target)) : 0, overdue: !!g.due && mk > g.due && !reached };
+}
+
+/** Dinheiro guardado hoje (reserva, metas ativas e outros investimentos) e quanto será em 12 meses pelo plano. */
+export function savings(S, mk) {
+  const by = investByCat(S);
+  const goalCats = new Set((S.core.goals || []).map((g) => g.cat));
+  const reserve = reserveBalance(S);
+  const metas = sum(activeGoals(S), (g) => (g.saved0 || 0) + (by[g.cat] || 0));
+  let other = S.core.settings.investStart || 0;
+  for (const [c, v] of Object.entries(by)) if (c !== 'reserva' && !goalCats.has(c)) other += v;
+  const total = reserve + metas + other;
+  const rows = projection(S, mk, 12);
+  const plannedNow = rows[0] ? rows[0].invest : 0;
+  const realNow = sum(txOf(S, mk).filter((t) => t.k === 'invest'), (t) => t.v);
+  // o que já foi guardado neste mês não conta duas vezes
+  const in12 = total + sum(rows, (r) => r.invest) - Math.min(Math.max(0, realNow), plannedNow);
+  return { reserve, metas, other, total, in12, plannedNow, realNow };
+}
+
+/** Média por mês do plano nos próximos 12 meses: para onde vai a renda. */
+export function planSplit(S, fromMk) {
+  const t = { renda: 0, fixas: 0, verbas: 0, anuais: 0, guardar: 0 };
+  for (let i = 0; i < 12; i++) {
+    const mk = addMonths(fromMk, i);
+    for (const l of S.core.plan) {
+      if (!occurs(l, mk)) continue;
+      if (l.kind === 'receita') t.renda += l.amount;
+      else if (l.kind === 'invest') t.guardar += l.amount;
+      else if (l.type === 'verba') t.verbas += l.amount;
+      else if (l.rec === 'mensal') t.fixas += l.amount;
+      else t.anuais += l.amount;
+    }
+  }
+  for (const k of Object.keys(t)) t[k] = Math.round(t[k] / 12);
+  t.sobra = t.renda - t.fixas - t.verbas - t.anuais - t.guardar;
+  return t;
 }
 
 export function recentTx(S, n = 6) {

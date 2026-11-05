@@ -11,13 +11,15 @@ export const xpOf = (events) => (events.find((e) => e.type === 'xp') || {}).amou
 
 /** Celebra medalhas e níveis (o XP aparece no toast de quem chamou). */
 export function celebrateEvents(events) {
-  const order = { badge: 0, monthBlue: 1, level: 2 };
+  const order = { goalDone: 0, badge: 1, monthBlue: 2, level: 3 };
   const firstBlue = events.some((e) => e.type === 'badge' && e.badge && e.badge.id === 'azul');
   const list = events
     .filter((e) => e.type in order && !(firstBlue && e.type === 'badge' && e.badge.id === 'azul'))
     .sort((a, b) => order[a.type] - order[b.type]);
   for (const e of list) {
-    if (e.type === 'badge' && e.badge) celebrate({ emoji: e.badge.emoji, kicker: 'Nova medalha · +25 XP', title: e.badge.name, text: e.badge.desc });
+    if (e.type === 'goalDone')
+      celebrate({ emoji: e.goal.emoji || '🎯', kicker: 'Meta alcançada', title: e.goal.name, text: `Você juntou ${U.money(e.goal.target, { cents: false })}. Quando usar o dinheiro, abra a meta e toque em “Concluir”.`, cta: 'Que demais!' });
+    else if (e.type === 'badge' && e.badge) celebrate({ emoji: e.badge.emoji, kicker: 'Nova medalha · +25 XP', title: e.badge.name, text: e.badge.desc });
     else if (e.type === 'level') celebrate({ emoji: '⭐', kicker: `Nível ${e.level}`, title: e.name, text: 'Cada pequeno passo conta. Siga no seu ritmo.', cta: 'Bora!' });
     else if (e.type === 'monthBlue')
       celebrate({ emoji: '🔵', kicker: firstBlue ? 'Nova medalha · Mês no azul' : 'Mês fechado', title: `${U.cap(U.monthName(e.mk))} no azul`, text: `Você recebeu mais do que gastou: sobraram ${U.money(e.saldo)}. +${firstBlue ? 125 : 100} XP.` });
@@ -61,6 +63,11 @@ export function checkVisao(events) {
 export function addTx({ v, k, c, d = today(), n = '', p = null, ap = false, mk = null }) {
   const st = S();
   const m = mk || U.mkOf(d);
+  // guardou numa meta (ou na reserva) que está no plano e ainda não foi marcada neste mês: conta como o “Guardei” do mês
+  if (!p && k === 'invest' && v > 0) {
+    const due = M.monthCalc(st, m).bills.find((b) => !b.tx && b.line.kind === 'invest' && b.line.cat === c);
+    if (due) p = due.line.id;
+  }
   const bucket = (st.months[m] ||= { updatedAt: 0, tx: [] });
   const t = { id: U.uid(), d, v: Math.round(v), k, c, t: Date.now() };
   if (n && n.trim()) t.n = n.trim().slice(0, 80);
@@ -82,6 +89,7 @@ export function addTx({ v, k, c, d = today(), n = '', p = null, ap = false, mk =
     G.giveBadge(core, 'pague', events);
   }
   if (c === 'reserva') checkReserve(events);
+  if (k === 'invest') checkGoals(events);
   if (p) checkAllBills(m, events);
   store.save(['core', 'm-' + m]);
   return { t, m, events };
@@ -224,6 +232,157 @@ export function setReserve(balance, goalMonths) {
   checkReserve(events);
   store.save(['core']);
   return events;
+}
+
+/** Outros investimentos (fora reserva e metas): ajusta o saldo inicial para bater com o valor informado. */
+export function setInvestStart(balance) {
+  const st = S();
+  const sv = M.savings(st, curMk());
+  st.core.settings.investStart = (st.core.settings.investStart || 0) + balance - sv.other;
+  store.save(['core']);
+}
+
+// ---------- metas ----------
+/** Dia em que o salário cai (bom dia para guardar: pague-se primeiro). */
+function payday() {
+  const sal = S().core.plan.find((l) => l.kind === 'receita' && l.cat === 'salario' && l.day);
+  return sal ? sal.day : 5;
+}
+
+function goalLine(g, monthly, old = null) {
+  const l = { ...(old || {}), id: old ? old.id : U.uid(), name: g.name, kind: 'invest', cat: g.cat, amount: monthly, type: 'conta', rec: 'mensal', start: old ? old.start : curMk(), day: old && old.day ? old.day : payday(), goal: g.id };
+  if (g.due) l.end = g.due;
+  else delete l.end;
+  return l;
+}
+
+/** Marca metas que acabaram de chegar no valor (celebra uma vez). */
+export function checkGoals(events) {
+  const st = S();
+  const by = M.investByCat(st);
+  let changed = false;
+  for (const g of M.activeGoals(st)) {
+    const info = M.goalInfo(st, g, curMk(), by);
+    if (info.reached && !g.hit) {
+      g.hit = today();
+      changed = true;
+      G.giveBadge(st.core, 'metaok', events);
+      events.push({ type: 'goalDone', goal: g });
+    } else if (!info.reached && g.hit) {
+      delete g.hit;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/** Reavalia as metas depois de desfazer um “Guardei”. */
+export function refreshGoals() {
+  if (checkGoals([])) store.save(['core']);
+}
+
+/**
+ * Cria uma meta: uma subcategoria própria dentro de “Metas” (para os “Guardei”) e, com monthly > 0,
+ * um item no plano que aparece em “Contas do mês” até o prazo.
+ */
+export function createGoal({ name, emoji, target, due = null, saved0 = 0, monthly = 0 }) {
+  const st = S();
+  const cat = addCustomCat({ name, emoji: emoji || '🎯', kind: 'invest', parent: 'sonhos' });
+  cat.goal = 1;
+  const g = { id: U.uid(), name: cat.name, emoji: cat.emoji, target, due: due || null, saved0: saved0 || 0, cat: cat.id, line: null, created: today() };
+  if (monthly > 0) {
+    const l = goalLine(g, monthly);
+    st.core.plan.push(l);
+    g.line = l.id;
+  }
+  st.core.goals.push(g);
+  const events = [];
+  G.giveBadge(st.core, 'meta', events);
+  checkGoals(events);
+  checkVisao(events);
+  store.save(['core']);
+  return { goal: g, events };
+}
+
+export function updateGoal(id, { name, emoji, target, due = null, saved, monthly = 0 }) {
+  const st = S();
+  const g = M.goalById(st, id);
+  if (!g) return [];
+  g.name = String(name || g.name).trim().slice(0, 40);
+  g.emoji = (emoji || '').trim() || g.emoji || '🎯';
+  g.target = target;
+  g.due = due || null;
+  const cat = st.core.cats.find((c) => c.id === g.cat);
+  if (cat) Object.assign(cat, { name: g.name, emoji: g.emoji });
+  if (saved != null) g.saved0 = (g.saved0 || 0) + saved - M.goalInfo(st, g, curMk()).saved;
+  const old = g.line ? st.core.plan.find((l) => l.id === g.line) : null;
+  if (monthly > 0) {
+    const l = goalLine(g, monthly, old);
+    if (old) st.core.plan[st.core.plan.indexOf(old)] = l;
+    else {
+      st.core.plan.push(l);
+      g.line = l.id;
+    }
+  } else if (old) {
+    st.core.plan = st.core.plan.filter((l) => l !== old);
+    g.line = null;
+  }
+  // os “Guardei” ligados ao item do plano acompanham o nome novo da meta
+  const keys = new Set(['core']);
+  for (const mk in st.months)
+    for (const t of st.months[mk].tx)
+      if (t.c === g.cat && t.p && t.p === g.line && t.n !== g.name) {
+        t.n = g.name;
+        keys.add('m-' + mk);
+      }
+  const events = [];
+  checkGoals(events);
+  checkVisao(events);
+  store.save([...keys]);
+  return events;
+}
+
+/** “Guardei” numa meta: se o item do plano deste mês ainda não foi marcado, marca; senão, lança avulso. */
+export function goalDeposit(id, amount) {
+  const st = S();
+  const g = M.goalById(st, id);
+  if (!g || amount <= 0) return null;
+  return addTx({ v: amount, k: 'invest', c: g.cat, n: g.name });
+}
+
+/** Concluir (usou o dinheiro ou desistiu guardando o que juntou): sai da lista e para de entrar no plano. */
+export function concludeGoal(id) {
+  const st = S();
+  const g = M.goalById(st, id);
+  if (!g) return;
+  g.done = today();
+  const line = g.line ? st.core.plan.find((l) => l.id === g.line) : null;
+  if (line) {
+    const mk = curMk();
+    const paidNow = M.txOf(st, mk).some((t) => t.p === line.id);
+    const end = paidNow ? mk : U.addMonths(mk, -1);
+    if (end < line.start) st.core.plan = st.core.plan.filter((l) => l !== line);
+    else line.end = end;
+  }
+  store.save(['core']);
+}
+
+export function reopenGoal(id) {
+  const g = M.goalById(S(), id);
+  if (!g) return;
+  delete g.done;
+  store.save(['core']);
+}
+
+/** Apaga a meta. O que já foi guardado continua no histórico, em “Metas”. */
+export function deleteGoal(id) {
+  const st = S();
+  const g = M.goalById(st, id);
+  if (!g) return;
+  if (g.line) st.core.plan = st.core.plan.filter((l) => l.id !== g.line);
+  st.core.goals = st.core.goals.filter((x) => x.id !== id);
+  removeCustomCat(g.cat);
+  store.save(['core']);
 }
 
 // ---------- exportações ----------

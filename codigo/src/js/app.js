@@ -5,11 +5,14 @@ import * as A from './actions.js';
 import * as V from './views.js';
 import * as SH from './sheets.js';
 import { openImport } from './importui.js';
+import * as GU from './goalsui.js';
+import * as M from './model.js';
 import { toast } from './ui.js';
 import { store } from './store.js';
 import { IC, $, $$, closeAllSheets, sheetOpen } from './ui.js';
 
-const TABS = ['inicio', 'mes', 'plano', 'conquistas'];
+// "conquistas" não fica na barra: abre pelo nível/XP no topo e pelo atalho na aba Metas
+const TABS = ['inicio', 'mes', 'plano', 'metas', 'conquistas'];
 let inArtifact = false;
 
 /** Dentro do Claude (artefato) a conexão com a nuvem pode chegar um instante depois do carregamento. */
@@ -44,7 +47,7 @@ function render() {
   $('#topbar').innerHTML = V.topbarHTML();
   const view = $('#view');
   const t = ctx.ui.tab;
-  view.innerHTML = t === 'mes' ? V.monthHTML() : t === 'plano' ? V.planHTML() : t === 'conquistas' ? V.gameHTML() : V.homeHTML();
+  view.innerHTML = t === 'mes' ? V.monthHTML() : t === 'plano' ? V.planHTML() : t === 'metas' ? V.goalsHTML() : t === 'conquistas' ? V.gameHTML() : V.homeHTML();
   view.classList.toggle('animate', ctx.ui.animate);
   ctx.ui.animate = false;
   V.mountCharts(view);
@@ -78,7 +81,7 @@ function tabbarHTML() {
   const item = (tab, icon, label) => `<button class="tab" data-act="tab" data-tab="${tab}">${icon}<span>${label}</span></button>`;
   return `${item('inicio', IC.home, 'Início')}${item('mes', IC.month, 'Mês')}
     <button class="fab" data-act="add" aria-label="Novo lançamento">${IC.plus}</button>
-    ${item('plano', IC.plan, 'Plano')}${item('conquistas', IC.trophy, 'Conquistas')}`;
+    ${item('plano', IC.plan, 'Plano')}${item('metas', IC.target, 'Metas')}`;
 }
 
 document.addEventListener('click', (e) => {
@@ -154,10 +157,38 @@ document.addEventListener('click', (e) => {
     case 'reserve-edit':
       SH.openReserve();
       break;
+    case 'goal-new':
+      GU.openGoalEditor(null, { idea: d.idea != null ? M.GOAL_IDEAS[+d.idea] : null });
+      break;
+    case 'goal-open':
+      GU.openGoal(d.id);
+      break;
+    case 'goals-done':
+      ctx.ui.showDoneGoals = !ctx.ui.showDoneGoals;
+      render();
+      break;
+    case 'invest-edit':
+      GU.openInvestEdit();
+      break;
+    case 'plan-group': {
+      const set = ctx.ui.planOpen;
+      if (set.has(d.id)) set.delete(d.id);
+      else set.add(d.id);
+      render();
+      break;
+    }
     default:
       break;
   }
 });
+// a tabela da aba Plano continua aberta (ou fechada) quando a tela é redesenhada
+document.addEventListener(
+  'toggle',
+  (e) => {
+    if (e.target.dataset && e.target.dataset.keep === 'planTable') ctx.ui.planTable = e.target.open;
+  },
+  true
+);
 
 function routeHash() {
   const h = decodeURIComponent((location.hash || '').slice(1));
@@ -170,6 +201,7 @@ function routeHash() {
     acerto: () => SH.openCatchUp(),
     importar: () => openImport(),
     ajustes: () => SH.openSettings(),
+    'nova-meta': () => GU.openGoalEditor(),
   };
   if (actions[h]) {
     setTab(ctx.ui.tab || 'inicio');

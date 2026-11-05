@@ -43,6 +43,8 @@ export const BADGES = [
   { id: 'reserva1', emoji: '🛟', name: 'Reserva: 1 mês', desc: 'A reserva cobre 1 mês de custo de vida.' },
   { id: 'reserva3', emoji: '🛡️', name: 'Reserva: 3 meses', desc: 'O mínimo que Cerbasi recomenda.' },
   { id: 'reserva6', emoji: '🏰', name: 'Reserva: 6 meses', desc: 'A meta: seis meses de tranquilidade.' },
+  { id: 'meta', emoji: '🎯', name: 'Sonho com data', desc: 'Criou uma meta com valor e prazo.' },
+  { id: 'metaok', emoji: '🏁', name: 'Meta alcançada', desc: 'Juntou todo o valor de uma meta.' },
 ];
 
 export const badgeById = (id) => BADGES.find((b) => b.id === id);

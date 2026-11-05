@@ -7,7 +7,7 @@ import * as A from './actions.js';
 import { store } from './store.js';
 import { IC, $, $$, openSheet, closeSheet, sheetHead, confirmDialog, toast, vibrate } from './ui.js';
 import { legendHTML, mountChart, billRowHTML } from './views.js';
-import { catBrowserHTML, catPickerHTML, openCategories } from './catui.js';
+import { catBrowserHTML, catPickerHTML, catPickerClick, createFromSearch, openCategories } from './catui.js';
 import { openImport } from './importui.js';
 
 const AUTO_LABEL = {
@@ -21,7 +21,7 @@ const { esc, money } = U;
 const m0 = (v) => money(v, { cents: false });
 const rerender = () => ctx.render();
 
-function monthPicker(name, value, { from = -1, to = 3 } = {}) {
+export function monthPicker(name, value, { from = -1, to = 3 } = {}) {
   const [vy, vm] = (value || curMk()).split('-').map(Number);
   const y0 = new Date().getFullYear();
   const years = [];
@@ -29,7 +29,7 @@ function monthPicker(name, value, { from = -1, to = 3 } = {}) {
   if (!years.includes(vy)) years.unshift(vy);
   return `<span class="mpick"><select name="${name}_m" aria-label="Mês">${U.MESES.map((m, i) => `<option value="${i + 1}" ${i + 1 === vm ? 'selected' : ''}>${U.cap(m)}</option>`).join('')}</select><select name="${name}_y" aria-label="Ano">${years.map((y) => `<option ${y === vy ? 'selected' : ''}>${y}</option>`).join('')}</select></span>`;
 }
-const readMonth = (form, name) => `${form.elements[name + '_y'].value}-${U.pad(form.elements[name + '_m'].value)}`;
+export const readMonth = (form, name) => `${form.elements[name + '_y'].value}-${U.pad(form.elements[name + '_m'].value)}`;
 
 
 // =============== LANÇAMENTO RÁPIDO ===============
@@ -66,7 +66,7 @@ export function openQuickAdd(kind = 'despesa') {
     <p class="qa-hint"></p>
     <div class="qa-pick" hidden></div>
     <div class="qa-cats" role="group" aria-label="Categoria"></div>
-    <div class="qa-more" hidden><div class="search"><input type="search" placeholder="Buscar: streaming, farmácia, uber…" data-more-q aria-label="Buscar categoria"></div><div class="cat-browser" data-more-list></div><button type="button" class="link center" data-more-close>Voltar ao teclado</button></div>
+    <div class="qa-more" hidden><div class="search"><input type="search" placeholder="Buscar ou criar: pilates, farmácia, uber…" data-more-q aria-label="Buscar categoria"></div><div class="cat-browser" data-more-list></div><button type="button" class="link center" data-more-close>Voltar ao teclado</button></div>
     <div class="keypad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0', 'del'].map((k) => `<button type="button" data-key="${k}" aria-label="${k === 'del' ? 'Apagar' : k}">${k === 'del' ? IC.backspace : k}</button>`).join('')}</div>
     <button type="button" class="btn primary wide qa-save" disabled>Salvar</button>
   </div>`;
@@ -136,6 +136,19 @@ export function openQuickAdd(kind = 'despesa') {
         });
       };
 
+      const choose = (id) => {
+        q.cat = id;
+        $$('.qa-cats [data-cat]', el).forEach((b) => b.classList.toggle('on', b.dataset.cat === q.cat));
+        if (q.cents) return save();
+        closeMore();
+        drawPick();
+        amountEl.classList.remove('shake');
+        void amountEl.offsetWidth;
+        amountEl.classList.add('shake');
+        $('.qa-hint', el).textContent = 'Agora digite o valor.';
+        drawAmount();
+      };
+
       el.addEventListener('input', (e) => {
         if (e.target.matches('[data-more-q]')) $('[data-more-list]', el).innerHTML = catBrowserHTML(q.kind, e.target.value, 'data-cat');
       });
@@ -174,22 +187,13 @@ export function openQuickAdd(kind = 'despesa') {
           drawAmount();
           return;
         }
-        const c = e.target.closest('[data-cat]');
-        if (c) {
-          q.cat = c.dataset.cat;
-          $$('.qa-cats [data-cat]', el).forEach((b) => b.classList.toggle('on', b.dataset.cat === q.cat));
-          if (q.cents) save();
-          else {
-            closeMore();
-            drawPick();
-            amountEl.classList.remove('shake');
-            void amountEl.offsetWidth;
-            amountEl.classList.add('shake');
-            $('.qa-hint', el).textContent = 'Agora digite o valor.';
-            drawAmount();
-          }
+        const nc = createFromSearch(e, q.kind);
+        if (nc) {
+          nc.then((c) => c && choose(c.id));
           return;
         }
+        const c = e.target.closest('[data-cat]');
+        if (c) return choose(c.dataset.cat);
         if (e.target.closest('.qa-save')) save();
       });
       dateSel.addEventListener('change', () => {
@@ -263,11 +267,13 @@ export function openTxEdit(mk, id) {
       onMount: (el, close) => {
         const form = $('form', el);
         el.addEventListener('click', async (e) => {
-          const c = e.target.closest('[data-pick]');
-          if (c) {
-            cat = c.dataset.pick;
-            $('.cat-picker', el).innerHTML = catPickerHTML(t.k, cat);
-          }
+          if (
+            catPickerClick(e, (id) => {
+              cat = id;
+              $('.cat-picker', el).innerHTML = catPickerHTML(t.k, cat);
+            })
+          )
+            return;
           if (e.target.closest('[data-del]')) {
             const ok = await confirmDialog({ title: 'Excluir lançamento?', text: `${esc(t.n || M.catById(S(), t.c).name)} · ${money(t.v)}`, ok: 'Excluir', danger: true });
             if (!ok) return;
@@ -433,7 +439,8 @@ function saveCatchup(items) {
 export function openCatchUp() {
   const st = S();
   const last = st.core.game.lastActive;
-  const cats = st.core.cats.filter((c) => c.kind === 'despesa' && !c.hidden);
+  // só as categorias principais: num acerto aproximado, subcategoria só encheria a lista
+  const cats = M.groupsOf(st, 'despesa');
   const first = cats.filter((c) => ['mercado', 'comer', 'transporte', 'lazer', 'outros'].includes(c.id));
   const rest = cats.filter((c) => !first.includes(c));
   openSheet(
@@ -659,12 +666,13 @@ export function openLineEditor(line = null, defaults = {}) {
             sync();
             return;
           }
-          const c = e.target.closest('[data-pick]');
-          if (c) {
-            L.cat = c.dataset.pick;
-            $('[data-cats]', form).innerHTML = catPickerHTML(L.kind, L.cat);
+          if (
+            catPickerClick(e, (id) => {
+              L.cat = id;
+              $('[data-cats]', form).innerHTML = catPickerHTML(L.kind, L.cat);
+            })
+          )
             return;
-          }
           const mt = e.target.closest('[data-m]');
           if (mt) {
             const m = +mt.dataset.m;
@@ -837,7 +845,7 @@ export function openSettings() {
       </div>
       <h3 class="group">Plano e método</h3>
       <div class="set-list">
-        <button type="button" class="set-row" data-s="cats"><span>🏷️</span><span>Categorias e atalhos<small>Os 9 atalhos de lançar, itens novos e regras aprendidas</small></span></button>
+        <button type="button" class="set-row" data-s="cats"><span>🏷️</span><span>Categorias e atalhos<small>Atalhos de lançar, subcategorias e regras aprendidas</small></span></button>
         <button type="button" class="set-row" data-s="wizard"><span>🗺️</span><span>Refazer o assistente do plano<small>Renda, contas, verbas e gastos anuais</small></span></button>
         <button type="button" class="set-row" data-s="metodo"><span>📖</span><span>Sobre o método<small>Como o app aplica as ideias do Cerbasi</small></span></button>
         <button type="button" class="set-row" data-s="instalar"><span>📲</span><span>Usar como app no celular<small>Ícone na tela inicial e atalho “Novo gasto”</small></span></button>
@@ -925,9 +933,9 @@ export function openMethod() {
     `${sheetHead('Sobre o método', 'O que vem do Gustavo Cerbasi e como o app aplica')}
     <div class="prose">
       <h3>1. Orçamento é projetar o futuro</h3>
-      <p>Para Cerbasi, orçamento não é só anotar o que já foi: é o hábito de projetar o que vem pela frente. A planilha de orçamento doméstico dele coloca os 12 meses lado a lado, com receitas e despesas por categoria (habitação, transporte, saúde, educação, despesas pessoais, lazer…), previsto e realizado. <b>No app:</b> aba Plano (projeção de 12 meses) e aba Mês (previsto x realizado).</p>
+      <p>Para Cerbasi, orçamento não é só anotar o que já foi: é o hábito de projetar o que vem pela frente. A planilha de orçamento doméstico dele coloca os 12 meses lado a lado, com receitas e despesas por categoria (habitação, transporte, saúde, educação, despesas pessoais, lazer…), previsto e realizado. <b>No app:</b> aba Plano (projeção de 12 meses, com a sobra acumulada mês a mês) e aba Mês (previsto x realizado).</p>
       <h3>2. Pague-se primeiro</h3>
-      <p>Inverter a ordem: estimar os sonhos, definir quanto guardar por mês e descontar isso da renda antes de qualquer gasto. O que sobra define o padrão de vida. Na planilha, o investimento entra como uma “despesa” do mês. <b>No app:</b> item “Pague-se primeiro” no plano, com botão “Guardei”.</p>
+      <p>Inverter a ordem: estimar os sonhos, definir quanto guardar por mês e descontar isso da renda antes de qualquer gasto. O que sobra define o padrão de vida. Na planilha, o investimento entra como uma “despesa” do mês. <b>No app:</b> aba Metas: cada sonho com valor e prazo vira um “guardar por mês” no plano, com botão “Guardei”; e o item “Pague-se primeiro” para a reserva.</p>
       <h3>3. Os gastos que vêm uma vez por ano</h3>
       <p>IPVA, IPTU, matrícula, material escolar, seguro, presentes. Colocados no plano desde já, eles aparecem no mês certo e o app sugere quanto separar por mês. <b>No app:</b> itens “meses do ano” e a dica de provisão.</p>
       <h3>4. Reserva de emergência primeiro</h3>

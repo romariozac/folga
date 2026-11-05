@@ -7,13 +7,27 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 > O Folga não é um produto oficial do Gustavo Cerbasi. Ele aplica ideias públicas dele (entrevistas,
 > resumos de livros e a planilha de orçamento doméstico). As fontes estão no fim deste arquivo.
 
-## As 3 telas que respondem o que você pediu
+## As telas que respondem o que você pediu
 
 | Pergunta | Onde |
 |---|---|
 | Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. A aba **Mês** mostra previsto x realizado por categoria. |
-| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: gráfico e tabela dos próximos 12 meses (entra, sai, sobra, acumulado). Os meses no vermelho aparecem marcados e com o motivo (ex.: “Janeiro: IPVA e matrícula”). |
-| Como me manter animado? | **Conquistas**: níveis, XP, semanas em dia, medalhas, a “Jornada Cerbasi” e a reserva de emergência. |
+| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **linha do acumulado** (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
+| Quanto já guardei e para quê? | **Metas**: o total guardado (reserva, metas e outros investimentos), quanto terá em 12 meses seguindo o plano, cada meta com barra de progresso e ritmo, e a reserva de emergência. |
+| Como me manter animado? | **Conquistas** (toque no seu nível, no topo, ou no atalho da aba Metas): níveis, XP, semanas em dia, medalhas e a “Jornada Cerbasi”. |
+
+## Metas: viagem, carro, casa…
+
+Aba **Metas › Nova meta**. Diga o nome (ou toque numa ideia: viagem em família, trocar de carro, entrada da casa…),
+**quanto custa**, **para quando** e quanto já tem guardado. O app calcula **quanto guardar por mês** e mostra como a
+sobra média do plano fica com esse valor (e avisa se o plano for para o vermelho). Com “Pôr no plano”, a meta entra na
+projeção e aparece em “Contas do mês” até o prazo: um toque em **Guardei** e pronto. Também dá para lançar pelo
+**+ › Guardei**, onde cada meta tem seu botão.
+
+- Cada meta mostra a barra de progresso, quanto falta e se está **no ritmo** ou o que guardar por mês para chegar no prazo.
+- Ao juntar o valor, o app comemora; quando usar o dinheiro, toque em **Concluir** (ela sai da lista, e as concluídas
+  ficam guardadas).
+- Cada meta vira uma subcategoria de **Metas** (categoria de investimento), então o histórico fica certinho.
 
 ## Por que este app não deve ter o mesmo destino dos outros
 
@@ -89,7 +103,12 @@ Nubank são tratados como investimento/resgate e saques vão para *Saque em dinh
   Internet, **TV e streaming**, Diarista). Na planilha do Cerbasi, TV por assinatura fica em Habitação; por isso o streaming está em Moradia.
 - A tela de lançar mostra **9 atalhos + “Mais”**. Em “Mais” está tudo, com **busca** (“netflix” encontra *TV e streaming*).
 - **Sugestão pela descrição:** digitou “Uber”, aparece *App e táxi*.
-- Em *Ajustes › Categorias e atalhos* você escolhe os atalhos (★), cria itens e vê/apaga as regras aprendidas.
+- **Criar subcategoria, sem encher a tela:** a subcategoria nova fica guardada dentro da categoria de cima e só aparece
+  quando você abre essa categoria (e na busca). Dá para criar onde você precisar: na busca do “Mais” (procurou e não
+  achou? **Criar “Pilates”**, e o app sugere onde ela fica), nas perguntas da importação, no **+ Nova** ao escolher a
+  categoria de um lançamento ou item do plano, e em *Ajustes › Categorias e atalhos* (categorias fechadas; toque para
+  ver e criar subcategorias). O acerto rápido mostra só as categorias principais.
+- Em *Ajustes › Categorias e atalhos* você também escolhe os atalhos (★) e vê/apaga as regras aprendidas.
 - Na aba **Mês**, toque no nome de um grupo para ver o detalhe por item.
 
 ## Débito automático
@@ -101,9 +120,9 @@ No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito 
 
 | Ideia do método | No Folga |
 |---|---|
-| Orçamento é **projetar** o que vem pela frente, não só controlar o passado | Aba Plano: projeção de 12 meses com saldo e acumulado |
+| Orçamento é **projetar** o que vem pela frente, não só controlar o passado | Aba Plano: projeção de 12 meses com sobra do mês e linha do acumulado |
 | A planilha coloca **previsto x realizado**, mês a mês, por categoria (habitação, transporte, saúde, educação, despesas pessoais, lazer…) | Aba Mês e a exportação “planilha de 12 meses” (.csv para Excel/Google Planilhas) |
-| **Inverter a ordem**: definir quanto guardar para os sonhos e só depois gastar o que sobra | Item “Pague-se primeiro” no plano (sugestão de 5 a 20% da renda) e a calculadora “quanto guardar pelo seu sonho” |
+| **Inverter a ordem**: definir quanto guardar para os sonhos e só depois gastar o que sobra | Aba Metas (cada sonho com valor, prazo e quanto guardar por mês, já no plano) e o item “Pague-se primeiro” (sugestão de 5 a 20% da renda) |
 | Gastos **anuais/sazonais** (IPVA, IPTU, matrícula, material escolar, presentes) | Itens “meses do ano”, alerta dos meses no vermelho e a dica de quanto separar por mês |
 | **Reserva de emergência**: mínimo de 3 meses de custo de vida, mirando em 6 | Medidor da reserva com medalhas em 1, 3 e 6 meses |
 | **Renda variável**: planejar pelo menor ganho provável | Dica no assistente de receitas |
@@ -160,7 +179,8 @@ codigo/src/
   index.html, styles.css, sw.js, manifest.webmanifest, icons/, fonts/
   js/
     app.js      inicialização, abas, navegação por #hash (#novo-gasto, #checkin...)
-    views.js    telas Início, Mês, Plano, Conquistas e o gráfico interativo
+    views.js    telas Início, Mês, Plano, Metas, Conquistas e o gráfico interativo
+    goalsui.js  metas: criar/editar, andamento, “Guardei” e outros investimentos
     sheets.js   lançamento rápido, acerto, check-in, editor do plano, ajustes, assistente
     actions.js  operações (lançar, marcar conta, check-in, importar, automático) e exportações
     model.js    plano, projeção, previsto x realizado, categorias em 2 níveis, busca e sugestão
@@ -169,15 +189,14 @@ codigo/src/
     ocr.js      leitura de prints no aparelho (Tesseract.js: prepara a imagem, lê palavras e cores)
     screen.js   transforma as palavras do print em lançamentos (linhas, itens, datas, entrada ou saída)
     merchants.js lojas e serviços conhecidos → categoria
-    catui.js    busca de categorias, seletor em 2 níveis, tela de atalhos
+    catui.js    busca de categorias, seletor em 2 níveis, criar subcategoria, tela de atalhos
     game.js     XP, níveis, semanas em dia, medalhas
     store.js    localStorage + sincronização com a conta (quando aberto no Claude)
-    charts.js   gráfico de barras em SVG
+    charts.js   gráfico de barras com a linha do acumulado, em SVG
 ```
 
 ## Ideias para as próximas versões
 
-- Metas/sonhos com barra de progresso própria (além da reserva).
 - Modo casal (orçamento compartilhado, como em *Casais Inteligentes Enriquecem Juntos*).
 - Lembrete por notificação no dia do check-in.
 - Abrir arquivos direto do app do banco pelo “Compartilhar” do Android (app instalado).
