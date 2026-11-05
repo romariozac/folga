@@ -50,9 +50,11 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
   “próximas faturas”.
 - **Categoria do banco:** quando a fatura imprime a categoria embaixo da compra (supermercado, restaurante, saúde…),
   ela vira pista para categorizar.
-- **Prints, lidos no próprio celular:** escolha até 12 prints da fatura ou do extrato. A leitura (OCR, com o
-  Tesseract) roda no aparelho: **não usa o Claude** nem gasta seus tokens, e a imagem não vai para lugar nenhum. Na
-  primeira vez ele baixa uns 5 MB; depois funciona até sem internet. Entende cabeçalhos de data (“Hoje”, “Ontem”,
+- **Prints, lidos no próprio celular (no app instalado):** escolha até 12 prints da fatura ou do extrato. A leitura
+  (OCR, com o Tesseract) roda no aparelho: **não usa o Claude** nem gasta seus tokens, e a imagem não vai para lugar
+  nenhum. Na primeira vez ele baixa uns 5 MB; depois funciona até sem internet. No link do Claude a leitura de prints
+  não roda (o Claude só deixa a página carregar arquivos de alguns sites, e o leitor precisa baixar o idioma
+  português): lá, o botão explica como abrir o app instalado. Entende cabeçalhos de data (“Hoje”, “Ontem”,
   “Seg, 3 de novembro”), modo escuro, valor em verde como entrada, compra em dólar e prints que se repetem em parte
   (o item que aparece em dois prints entra uma vez só). Dica: print da lista de lançamentos, sem cortar os valores,
   e vários prints de uma vez. Confira datas e valores na revisão.
@@ -118,15 +120,16 @@ No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito 
 
 **Opção 1: pelo link do Claude (já funciona).** Abra o link do artefato no Chrome e use
 *⋮ → Adicionar à tela inicial*. Seus dados ficam guardados na sua conta Claude, privados, e aparecem em
-qualquer aparelho em que você abrir o link. O atalho criado assim usa o ícone do site do Claude, não o do Folga.
+qualquer aparelho em que você abrir o link. Tudo funciona, menos a leitura de prints. O atalho criado assim usa o
+ícone do site do Claude, não o do Folga.
 
 **Opção 2: como app instalável completo (ícone do Folga, offline e atalhos).** O app fica publicado pelo
 GitHub Pages em <https://romariozac.github.io/folga/>. Abra esse endereço no Chrome do celular e toque em
 *⋮ → Instalar app*. Segure o dedo no ícone do Folga para ver os atalhos **Novo gasto**, **Importar extrato** e
 **Check-in**; arraste “Novo gasto” para a tela inicial e lançar vira coisa de 3 segundos.
 
-Tudo funciona igual ao link do Claude (inclusive prints e palpites), com uma diferença: os dados ficam só no
-celular, sem sincronizar com a conta do Claude. Para levar o que você já lançou: no link do Claude,
+Aqui tudo funciona, inclusive a leitura de prints, com uma diferença: os dados ficam só no celular, sem
+sincronizar com a conta do Claude. Para levar o que você já lançou: no link do Claude,
 *Ajustes → Fazer backup*; no app instalado, *Ajustes → Restaurar backup*. Depois, faça backups de vez em quando.
 
 ## Dados e privacidade
