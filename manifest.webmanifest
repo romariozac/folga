@@ -1,0 +1,24 @@
+{
+  "name": "Folga — finanças sem culpa",
+  "short_name": "Folga",
+  "description": "Planejamento financeiro simples no método do Gustavo Cerbasi: lançamento em 2 toques, projeção de 12 meses e gamificação sem culpa.",
+  "lang": "pt-BR",
+  "id": "./",
+  "start_url": "./#inicio",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f0e8",
+  "theme_color": "#f3f0e8",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Novo gasto", "short_name": "Gasto", "url": "./#novo-gasto", "icons": [{ "src": "icons/sc-gasto.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Importar extrato", "short_name": "Importar", "url": "./#importar", "icons": [{ "src": "icons/sc-importar.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Check-in da semana", "short_name": "Check-in", "url": "./#checkin", "icons": [{ "src": "icons/sc-checkin.png", "sizes": "96x96", "type": "image/png" }] }
+  ]
+}

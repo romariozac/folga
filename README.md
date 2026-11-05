@@ -1,0 +1,182 @@
+# Folga: finanças sem culpa
+
+App de finanças pessoais para quem já tentou de tudo e sempre parou depois de 1 ou 2 dias sem lançar.
+Ele se baseia no método de orçamento do Gustavo Cerbasi: **projetar o futuro** (receitas e despesas dos
+próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar sem neura**.
+
+> O Folga não é um produto oficial do Gustavo Cerbasi. Ele aplica ideias públicas dele (entrevistas,
+> resumos de livros e a planilha de orçamento doméstico). As fontes estão no fim deste arquivo.
+
+## As 3 telas que respondem o que você pediu
+
+| Pergunta | Onde |
+|---|---|
+| Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. A aba **Mês** mostra previsto x realizado por categoria. |
+| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: gráfico e tabela dos próximos 12 meses (entra, sai, sobra, acumulado). Os meses no vermelho aparecem marcados e com o motivo (ex.: “Janeiro: IPVA e matrícula”). |
+| Como me manter animado? | **Conquistas**: níveis, XP, semanas em dia, medalhas, a “Jornada Cerbasi” e a reserva de emergência. |
+
+## Por que este app não deve ter o mesmo destino dos outros
+
+1. **Lançar leva 2 toques.** O app abre num teclado numérico: digite o valor e toque na categoria. Salva na hora.
+2. **As contas fixas já vêm do plano.** Aluguel, condomínio, plano de saúde, salário etc. aparecem na lista
+   “Contas do mês”; um toque em *Paguei* / *Recebi* / *Guardei* e pronto. Você não digita nada disso.
+3. **Ficou dias sem lançar? Sem culpa.** O app mostra “6 dias sem lançar? Tudo bem” e oferece um **acerto
+   rápido**: um total aproximado por categoria (olhando o app do banco). Ou só “seguir daqui”.
+4. **Voltar dá prêmio, não bronca.** Voltar depois de uma pausa vale +30 XP e a medalha 🪃 “De volta ao jogo”.
+5. **Semanas, não dias.** A sequência conta *semanas* em dia (qualquer lançamento ou o check-in vale), e o
+   recorde fica guardado. Isso segue a recomendação (do resumo do livro do Cerbasi) de fazer o controle
+   semanal ou quinzenal, não diário.
+6. **Check-in semanal de 2 minutos** (+50 XP): marcar contas, lançar o que faltou (aproximado) e olhar o ritmo do mês.
+
+## Importar extrato e fatura (o app lança sozinho)
+
+Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
+
+- **Formatos:** OFX (Itaú, Bradesco, BB, Santander, Caixa, Inter e outros), CSV (Nubank e outros), **PDF da fatura**
+  ou **texto colado** (copie as linhas do extrato e cole).
+- **Categoriza sozinho**, nesta ordem: regras que aprendeu com você → seu histórico → estabelecimentos conhecidos
+  (iFood, Uber, Netflix, postos, farmácias, supermercados, concessionárias de luz e água…).
+- **Pergunta só o que ficar em dúvida**, uma pergunta por vez (ex.: “PIX ENVIADO MARIA SILVA, R$ 150: em que categoria entra?”).
+  A resposta fica guardada: da próxima vez, “Maria Silva” já entra como *Diarista*, sem perguntar.
+- **Não conta duas vezes:** ignora o pagamento da fatura no extrato do banco (os gastos entram pela própria fatura),
+  resgates de investimento e transferências entre suas contas; reconhece o que já foi importado e o que você já tinha lançado à mão.
+- **Marca as contas do plano:** um Pix de R$ 1.500 para a imobiliária marca o “Aluguel” como pago.
+- **Troca os acertos aproximados** daquele período pelos valores reais (você escolhe).
+- Estornos da fatura abatem o gasto da categoria.
+- **Confere sozinho:** quando a fatura traz o total (ex.: “Total dos lançamentos atuais” no Itaú), o app compara com a
+  soma lida e avisa se não bater.
+- **Parcelas:** a fatura mostra a data da compra original; o app lança a parcela no mês da fatura e ignora a seção
+  “próximas faturas”.
+- **Categoria do banco:** quando a fatura imprime a categoria embaixo da compra (supermercado, restaurante, saúde…),
+  ela vira pista para categorizar.
+- **Prints:** pelo link do Claude, dá para importar *prints* da fatura ou do extrato. O Claude lê as imagens e o app
+  categoriza (na primeira vez, o Claude pede sua permissão).
+- **Sugestões do Claude:** pelo link do Claude, o botão “Pedir sugestões ao Claude” categoriza de uma vez os
+  estabelecimentos que o app não conhece; você confere na revisão e as respostas viram regras.
+- Se o PDF não abrir, a mensagem traz um “Detalhe técnico” com o motivo. Prefira sempre o link do Claude ao arquivo
+  baixado: o arquivo baixado não recebe atualizações nem sincroniza.
+
+### Itaú, Caixa, Santander e Nubank
+
+| Banco | Extrato da conta | Fatura do cartão |
+|---|---|---|
+| **Nubank** | App: Conta → Pedir extrato → período → Exportar extrato → **OFX** ou **CSV** (chega por e-mail) | Na fatura, “Exportar”/“Enviar por e-mail” (CSV); se não houver, o **PDF** |
+| **Itaú** | Site: Conta corrente → Extrato → Salvar em → **OFX** (evite Excel; o PDF do app também funciona) | App: Cartões → Fatura → **PDF** |
+| **Santander** | Site: Conta Corrente → **Extrato (Money)** → **OFX** | **PDF** da fatura |
+| **Caixa** | Site: Minha Conta → Extrato em arquivo (txt, ofc e ofx) → Gerar arquivo para gerenciadores financeiros → **OFX** | **PDF** da fatura |
+
+Os nomes dos menus mudam com as atualizações dos bancos; o passo a passo também aparece dentro da tela de importação.
+O leitor já trata as particularidades desses bancos: aplicações e resgates automáticos (Itaú “Aplic Aut Mais”,
+Santander “ContaMax”) são ignorados, rendimentos viram receita, “Itaucard”/“PAG FAT CARTAO”/“Pagamento de fatura” são
+reconhecidos como pagamento da fatura, o Pix do Nubank é aprendido pelo nome da pessoa, Aplicação/Resgate RDB do
+Nubank são tratados como investimento/resgate e saques vão para *Saque em dinheiro*.
+
+## Categorias com detalhe, sem poluir
+
+- Os **grupos** seguem a planilha do Cerbasi (Moradia/Habitação, Mercado, Comer fora, Transporte, Saúde, Educação,
+  Pessoal, Lazer, Dívidas e tarifas, Filhos, Pets, Outros) e cada um tem **itens** (ex.: Moradia › Aluguel, Luz, Água,
+  Internet, **TV e streaming**, Diarista). Na planilha do Cerbasi, TV por assinatura fica em Habitação; por isso o streaming está em Moradia.
+- A tela de lançar mostra **9 atalhos + “Mais”**. Em “Mais” está tudo, com **busca** (“netflix” encontra *TV e streaming*).
+- **Sugestão pela descrição:** digitou “Uber”, aparece *App e táxi*.
+- Em *Ajustes › Categorias e atalhos* você escolhe os atalhos (★), cria itens e vê/apaga as regras aprendidas.
+- Na aba **Mês**, toque no nome de um grupo para ver o detalhe por item.
+
+## Débito automático
+
+No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito automático**: no dia do vencimento a conta
+é marcada como paga sozinha (streaming, academia, plano de saúde…). Para salário, “cai sozinho na conta”.
+
+## Como o app aplica o método Cerbasi
+
+| Ideia do método | No Folga |
+|---|---|
+| Orçamento é **projetar** o que vem pela frente, não só controlar o passado | Aba Plano: projeção de 12 meses com saldo e acumulado |
+| A planilha coloca **previsto x realizado**, mês a mês, por categoria (habitação, transporte, saúde, educação, despesas pessoais, lazer…) | Aba Mês e a exportação “planilha de 12 meses” (.csv para Excel/Google Planilhas) |
+| **Inverter a ordem**: definir quanto guardar para os sonhos e só depois gastar o que sobra | Item “Pague-se primeiro” no plano (sugestão de 5 a 20% da renda) e a calculadora “quanto guardar pelo seu sonho” |
+| Gastos **anuais/sazonais** (IPVA, IPTU, matrícula, material escolar, presentes) | Itens “meses do ano”, alerta dos meses no vermelho e a dica de quanto separar por mês |
+| **Reserva de emergência**: mínimo de 3 meses de custo de vida, mirando em 6 | Medidor da reserva com medalhas em 1, 3 e 6 meses |
+| **Renda variável**: planejar pelo menor ganho provável | Dica no assistente de receitas |
+| **Revisar** o plano pelo menos uma vez por mês | Check-in semanal e edição de qualquer item do plano |
+
+## Como usar no dia a dia
+
+- **Primeira vez (2 min):** o assistente pergunta renda, quanto guardar, contas fixas, gastos do dia a dia
+  e os “sustos do ano”, e mostra seu ano em um gráfico.
+- **Quando gastar:** botão **+** → valor → categoria.
+- **Quando pagar uma conta:** Início → *Paguei*.
+- **Uma vez por semana:** o check-in (o app lembra no dia escolhido em Ajustes).
+- **Se sumir uns dias:** *Acerto rápido* e siga em frente.
+
+## Instalar no celular (Android)
+
+**Opção 1: pelo link do Claude (já funciona).** Abra o link do artefato no Chrome e use
+*⋮ → Adicionar à tela inicial*. Seus dados ficam guardados na sua conta Claude, privados, e aparecem em
+qualquer aparelho em que você abrir o link.
+
+**Opção 2: como app instalável completo (offline + atalhos).** O app fica publicado pelo GitHub Pages em
+<https://romariozac.github.io/folga/>. Abra esse endereço no Chrome do celular e toque em *⋮ → Instalar app*.
+Segure o dedo no ícone do Folga para ver os atalhos **Novo gasto**, **Importar extrato** e **Check-in**; arraste
+“Novo gasto” para a tela inicial e lançar vira coisa de 3 segundos.
+
+Nesta opção os dados ficam só no celular (sem sincronizar com a conta do Claude) e a leitura de prints e as
+sugestões do Claude não estão disponíveis. Para levar os dados do link do Claude: lá, *Ajustes → Fazer backup*;
+aqui, *Ajustes → Restaurar backup*. Faça backups de vez em quando.
+
+## Dados e privacidade
+
+- Nada é conectado ao seu banco: você lança e o app planeja.
+- No link do Claude, os dados ficam na área privada da sua conta (nem o dono do artefato vê os dados de outra pessoa).
+- No app instalado, os dados ficam no navegador do celular. Há backup/restauração em `.json` e exportação em `.csv`.
+
+## Para desenvolver
+
+Este repositório tem o site publicado na raiz (é o que o GitHub Pages serve) e o código-fonte em `codigo/`.
+
+```bash
+cd codigo && npm install && node build.mjs
+```
+
+O build gera `codigo/dist/` com o `index.html` (CSS, JS e a fonte Bricolage Grotesque embutidos, licença OFL),
+`vendor/` com o pdf.js (licença Apache 2.0, carregado só ao importar PDF), `sw.js` (offline),
+`manifest.webmanifest` (instalação e atalhos) e os ícones. Para publicar uma nova versão, copie o conteúdo de
+`codigo/dist/` para a raiz do repositório.
+
+```
+codigo/src/
+  index.html, styles.css, sw.js, manifest.webmanifest, icons/, fonts/
+  js/
+    app.js      inicialização, abas, navegação por #hash (#novo-gasto, #checkin...)
+    views.js    telas Início, Mês, Plano, Conquistas e o gráfico interativo
+    sheets.js   lançamento rápido, acerto, check-in, editor do plano, ajustes, assistente
+    actions.js  operações (lançar, marcar conta, check-in, importar, automático) e exportações
+    model.js    plano, projeção, previsto x realizado, categorias em 2 níveis, busca e sugestão
+    importer.js leitura de OFX/CSV/PDF/texto, categorização, duplicados e contas do plano
+    importui.js telas da importação (perguntas e revisão)
+    catui.js    busca de categorias, seletor em 2 níveis, tela de atalhos
+    game.js     XP, níveis, semanas em dia, medalhas
+    store.js    localStorage + sincronização com a conta (quando aberto no Claude)
+    charts.js   gráfico de barras em SVG
+```
+
+## Ideias para as próximas versões
+
+- Metas/sonhos com barra de progresso própria (além da reserva).
+- Modo casal (orçamento compartilhado, como em *Casais Inteligentes Enriquecem Juntos*).
+- Lembrete por notificação no dia do check-in.
+- Abrir arquivos direto do app do banco pelo “Compartilhar” do Android (app instalado).
+- Sugestões de categoria com ajuda do Claude para estabelecimentos desconhecidos.
+
+## Fontes da pesquisa
+
+- Cerbasi sobre “orçamento inteligente”: inverter a ordem (sonhos → quanto guardar → o que sobra) e revisar o plano ao menos uma vez por mês: [Correio, “Questão de hábito: veja como montar um orçamento inteligente”](https://www.correio24horas.com.br/economia/questao-de-habito-veja-como-montar-um-orcamento-inteligente-0120)
+- Resumo de *Como Organizar Sua Vida Financeira*: controle semanal ou quinzenal (não diário) e ranking de gastos: [Mobills](https://www.mobills.com.br/?p=78393)
+- Orçamento como hábito de projetar o que vem pela frente: [Treasy](https://www.treasy.com.br/?p=19542)
+- Controle olha para o passado, planejamento olha para o futuro: [perfil do Cerbasi no TikTok](https://www.tiktok.com/@gustavocerbasi)
+- Planilha de orçamento doméstico (fluxo de caixa mensal e anual, receitas e despesas fixas e variáveis por categoria, investimentos): [vídeo sobre a planilha](https://www.youtube.com/watch?v=cw9I-sda1Nw) e [cópia compartilhada no Scribd](https://www.scribd.com/doc/49392715/Planilha-Orcamento-Familiar-CERBASI)
+- Reserva de emergência (mínimo de 3 meses; objetivo de 6): [Eu Quero Investir, Money Week](https://euqueroinvestir.com/money-week-gustavo-cerbasi-debate-planejamento-e-protecao-patrimonial/), [Superávit Caseiro (UFPel)](https://wp.ufpel.edu.br/superavit/2022/03/24/reserva-de-emergencia-a-melhor-opcao-para-superar-imprevistos-financeiros/)
+- Renda variável: planejar pelo menor ganho provável: [Forbes, “Cinco passos para o planejamento financeiro segundo Gustavo Cerbasi”](https://forbes.com.br/forbes-money/2022/10/cinco-passos-para-o-planejamento-financeiro-segundo-gustavo-cerbasi/)
+- Quanto poupar (cerca de 6–7% começando cedo; perto de 15% começando aos 40): [Guia da Semana](https://www.guiadasemana.com.br/tv-e-famosos/noticia/nao-tenha-pressa-de-ganhar)
+
+Observação: parte dessas páginas não pôde ser aberta na íntegra durante a pesquisa (o ambiente bloqueia alguns
+sites); as informações vieram dos trechos retornados pela busca. Os “três critérios para gastos eventuais”
+citados em resumos do livro não foram encontrados, então o app usa a prática geral de distribuir os gastos anuais pelos 12 meses.
