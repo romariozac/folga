@@ -9,29 +9,38 @@ import { toast, celebrate } from './ui.js';
 const S = () => ctx.S;
 export const xpOf = (events) => (events.find((e) => e.type === 'xp') || {}).amount || 0;
 
-/** Celebra medalhas e níveis (o XP aparece no toast de quem chamou). */
-export function celebrateEvents(events) {
-  const order = { goalDone: 0, badge: 1, monthBlue: 2, level: 3 };
+/** Medalhas, nível e mês no azul viram linhas discretas dentro do aviso (sem janela por cima da tela). */
+function rewardLines(events) {
   const firstBlue = events.some((e) => e.type === 'badge' && e.badge && e.badge.id === 'azul');
-  const list = events
-    .filter((e) => e.type in order && !(firstBlue && e.type === 'badge' && e.badge.id === 'azul'))
-    .sort((a, b) => order[a.type] - order[b.type]);
-  for (const e of list) {
-    if (e.type === 'goalDone')
-      celebrate({ emoji: e.goal.emoji || '🎯', kicker: 'Meta alcançada', title: e.goal.name, text: `Você juntou ${U.money(e.goal.target, { cents: false })}. Quando usar o dinheiro, abra a meta e toque em “Concluir”.`, cta: 'Que demais!' });
-    else if (e.type === 'badge' && e.badge) celebrate({ emoji: e.badge.emoji, kicker: 'Nova medalha · +25 XP', title: e.badge.name, text: e.badge.desc });
-    else if (e.type === 'level') celebrate({ emoji: '⭐', kicker: `Nível ${e.level}`, title: e.name, text: 'Cada pequeno passo conta. Siga no seu ritmo.', cta: 'Bora!' });
-    else if (e.type === 'monthBlue')
-      celebrate({ emoji: '🔵', kicker: firstBlue ? 'Nova medalha · Mês no azul' : 'Mês fechado', title: `${U.cap(U.monthName(e.mk))} no azul`, text: `Você recebeu mais do que gastou: sobraram ${U.money(e.saldo)}. +${firstBlue ? 125 : 100} XP.` });
+  const out = [];
+  for (const e of events) {
+    if (e.type === 'badge' && e.badge && !(firstBlue && e.badge.id === 'azul')) out.push(`${e.badge.emoji} Medalha nova: <b>${U.esc(e.badge.name)}</b>`);
+    else if (e.type === 'level') out.push(`⭐ Você subiu para o nível ${e.level}: <b>${U.esc(e.name)}</b>`);
+    else if (e.type === 'monthBlue') out.push(`🔵 ${U.cap(U.monthName(e.mk))} fechou no azul: sobraram ${U.money(e.saldo, { cents: false })}`);
   }
+  return out;
 }
 
-/** Toast padrão + celebrações. */
+/**
+ * Comemorações sem interromper: só a meta alcançada abre uma janela. Medalhas, nível e mês no azul
+ * aparecem num aviso discreto (quiet: quem chamou já mostra essas linhas no próprio aviso).
+ */
+export function celebrateEvents(events, { quiet = false } = {}) {
+  for (const e of events)
+    if (e.type === 'goalDone')
+      celebrate({ emoji: e.goal.emoji || '🎯', kicker: 'Meta alcançada', title: e.goal.name, text: `Você juntou ${U.money(e.goal.target, { cents: false })}. Quando usar o dinheiro, abra a meta e toque em “Concluir”.`, cta: 'Que demais!' });
+  if (quiet) return;
+  const lines = rewardLines(events);
+  if (lines.length) toast(lines.join('<br>'), { xp: 0, ms: 5200 });
+}
+
+/** Aviso padrão, com as recompensas numa linha menor embaixo. */
 export function notify(msgHtml, events = [], action = null, ms) {
   const cb = events.find((e) => e.type === 'comeback');
-  const msg = cb ? `${msgHtml}<br><small>Que bom te ver de volta! Recomeçar conta.</small>` : msgHtml;
-  toast(msg, { xp: xpOf(events), action, ...(ms ? { ms } : {}) });
-  celebrateEvents(events);
+  const extra = [...(cb ? ['Que bom te ver de volta! Recomeçar conta.'] : []), ...rewardLines(events)];
+  const msg = extra.length ? `${msgHtml}<br><small>${extra.join('<br>')}</small>` : msgHtml;
+  toast(msg, { xp: xpOf(events), action, ms: (ms || 4200) + (extra.length ? 1800 : 0) });
+  celebrateEvents(events, { quiet: true });
 }
 
 function checkAllBills(m, events) {
@@ -582,6 +591,7 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
     st.core.rules[r.key] = r.cat;
   }
   if (count) {
+    st.core.settings.lastImport = today();
     g.totalTx = (g.totalTx || 0) + count;
     G.markActivity(st.core, today(), 'entry', events);
     G.gainXP(st.core, G.XP.import, events);

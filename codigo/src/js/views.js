@@ -56,14 +56,18 @@ function tile(kind, label, real, prev) {
   </div>`;
 }
 
+/** Modo simples (padrão): menos telas e menos coisa em cada tela. */
+export const isSimple = () => S().core.settings.simple !== false;
+
 function monthCardHTML(c, hasPlan) {
   const hero = hasPlan ? c.saldoExp : c.saldoReal;
   const inv = c.prev.invest || c.real.invest;
+  const simple = isSimple();
   return `<section class="card month-card ${reveal()}">
-    <div class="card-head"><span class="eyebrow">${U.cap(U.monthName(c.mk))} · este mês</span><button class="link" data-act="tab" data-tab="mes">Previsto x realizado ${IC.right}</button></div>
+    <div class="card-head"><span class="eyebrow">${U.cap(U.monthName(c.mk))} · este mês</span><button class="link" data-act="tab" data-tab="mes">${simple ? 'Ver detalhes' : 'Previsto x realizado'} ${IC.right}</button></div>
     <p class="hero-label">${hasPlan ? 'Previsão de sobra no fim do mês' : 'Saldo do mês até agora'}</p>
     <p class="hero ${hero < 0 ? 'neg' : ''}">${heroMoney(hero)}</p>
-    <p class="hero-sub">${hasPlan ? (hero < 0 ? '<span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho. Veja onde ajustar na aba Mês.' : 'Se o resto do mês seguir o plano.') : 'Monte o plano para ver a previsão do mês.'}</p>
+    <p class="hero-sub">${hasPlan ? (hero < 0 ? `<span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho. ${simple ? 'Toque em “Ver detalhes” para ver onde ajustar.' : 'Veja onde ajustar na aba Mês.'}` : 'Se o resto do mês seguir o plano.') : 'Monte o plano para ver a previsão do mês.'}</p>
     <div class="tiles">${tile('in', 'Entrou', c.real.receita, c.prev.receita)}${tile('out', 'Gastou', c.real.despesa, c.prev.despesa)}</div>
     ${inv ? `<div class="invest-row"><i class="sw inv"></i><span class="inv-txt"><small>Pague-se primeiro</small><span>Guardou <b>${m0(c.real.invest)}</b>${c.prev.invest ? ` de ${m0(c.prev.invest)}` : ''}</span></span>${c.prev.invest && c.real.invest >= c.prev.invest ? `<span class="ok">${IC.check}</span>` : ''}</div>` : ''}
   </section>`;
@@ -184,12 +188,47 @@ export function txRowHTML(t) {
   </button></li>`;
 }
 
-function recentHTML() {
-  const list = M.recentTx(S(), 6);
+// ---------- importar: o hábito principal ----------
+const sinceImport = () => {
+  const last = S().core.settings.lastImport;
+  return last ? U.daysBetween(last, today()) : null;
+};
+const whenText = (d) => (d === 0 ? 'hoje' : d === 1 ? 'ontem' : `há ${d} dias`);
+/** Sem importar há 7 dias (ou nunca): o lembrete fica em destaque no Início. */
+const importDue = () => {
+  const d = sinceImport();
+  return d == null || d >= 7;
+};
+
+function importCardHTML() {
+  const d = sinceImport();
+  return `<section class="card note-card import-card ${reveal()}">
+    <span class="note-emo">📥</span>
+    <div>
+      <h2>${d == null ? 'Importe a fatura ou o extrato' : `Última importação: ${whenText(d)}`}</h2>
+      <p>${d == null ? 'É o jeito mais fácil de manter tudo em dia: o app lança sozinho e só pergunta 2 ou 3 dúvidas.' : 'Hora de importar de novo: o app lança tudo sozinho e só pergunta as dúvidas.'} Uma vez por semana, ou quando a fatura fechar, basta.</p>
+      <button class="btn lime" data-act="import">Importar agora</button>
+    </div>
+  </section>`;
+}
+
+function recentHTML({ importRow = true, n = 6 } = {}) {
+  const list = M.recentTx(S(), n);
+  const d = sinceImport();
   return `<section class="card ${reveal()}">
     <div class="card-head"><h2>Últimos lançamentos</h2>${list.length ? `<button class="link" data-act="tab" data-tab="mes">Ver o mês ${IC.right}</button>` : ''}</div>
-    ${list.length ? `<ul class="txs">${list.map(txRowHTML).join('')}</ul>` : `<div class="empty"><p>Nada lançado ainda. Toque no <b>+</b> aqui embaixo (valor, categoria, pronto) ou importe o extrato do banco.</p></div>`}
-    <button class="imp-drop slim" data-act="import"><span class="imp-ic">📥</span><span><b>Importar extrato ou fatura</b><small>O app lança sozinho e só pergunta as dúvidas</small></span></button>
+    ${list.length ? `<ul class="txs">${list.map(txRowHTML).join('')}</ul>` : `<div class="empty"><p>Nada lançado ainda. Importe a fatura ou o extrato (o app lança sozinho) ou toque no <b>+</b> para lançar à mão.</p></div>`}
+    ${importRow ? `<button class="imp-drop slim" data-act="import"><span class="imp-ic">📥</span><span><b>Importar extrato ou fatura</b><small>${d == null ? 'O app lança sozinho e só pergunta as dúvidas' : `Última importação: ${whenText(d)}`}</small></span></button>` : ''}
+  </section>`;
+}
+
+/** Modo simples: em vez do gráfico, só o aviso dos próximos meses no vermelho (o gráfico fica no Plano). */
+function nextMonthsHTML() {
+  const neg = M.projection(S(), curMk(), 6).filter((r) => r.saldo < 0);
+  if (!neg.length) return '';
+  return `<section class="card ${reveal()}">
+    <div class="card-head"><h2>Próximos meses</h2><button class="link" data-act="tab" data-tab="plano">Ver no Plano ${IC.right}</button></div>
+    ${alertsHTML(neg, 2)}
   </section>`;
 }
 
@@ -202,14 +241,19 @@ export function homeHTML() {
   const gap = g.lastActive ? U.daysBetween(g.lastActive, today()) : null;
   const sk = G.streakOf(st.core, today());
   const name = st.core.settings.name;
+  const simple = isSimple();
+  const comeback = gap !== null && gap >= 2;
+  // o lembrete de importar aparece em destaque quando está na hora (a volta depois de uma pausa já oferece importar)
+  const importTop = importDue() && !comeback;
   let h = `<section class="hello ${reveal()}"><p class="eyebrow">${U.longDate(today())}</p><h1>${greeting()}${name ? `, ${esc(name)}` : ''}</h1></section>`;
   if (!hasPlan) h += planCTAHTML();
   h += monthCardHTML(c, hasPlan);
-  if (gap !== null && gap >= 2) h += comebackHTML(gap);
+  if (comeback) h += comebackHTML(gap);
+  else if (importTop) h += importCardHTML();
   else if (!sk.checkinThisWeek && checkinWindow() && g.lastActive) h += checkinCardHTML();
   if (c.bills.length) h += billsHTML(c);
-  if (hasPlan) h += projPreviewHTML();
-  h += recentHTML();
+  if (hasPlan) h += simple ? nextMonthsHTML() : projPreviewHTML();
+  h += recentHTML({ importRow: !importTop, n: simple ? 4 : 6 });
   return h;
 }
 
@@ -269,7 +313,8 @@ export function monthHTML() {
   for (const t of c.txs) (byDay[t.d] ||= []).push({ ...t, mk });
   const days = Object.keys(byDay).sort().reverse();
 
-  return `<section class="month-nav ${reveal()}">
+  // no modo simples a aba Mês não fica na barra: ela abre pelo Início e tem o caminho de volta
+  return `${isSimple() ? `<button class="link back-link ${reveal()}" data-act="tab" data-tab="inicio">${IC.left}Início</button>` : ''}<section class="month-nav ${reveal()}">
       <button class="icon-btn" data-act="mk-prev" aria-label="Mês anterior">${IC.left}</button>
       <div><p class="eyebrow">${isCur ? 'Este mês' : mk > cm ? 'Mês futuro · só previsto' : 'Mês passado'}</p><h1>${U.monthLabel(mk)}</h1></div>
       <button class="icon-btn" data-act="mk-next" aria-label="Próximo mês">${IC.right}</button>
@@ -371,6 +416,26 @@ export function planHTML() {
   const redText = neg.length
     ? `<span class="flag-ic crit">!</span><span>${neg.length === 1 ? `${U.cap(U.monthName(neg[0].mk))} fecha` : `${neg.length} meses fecham`} no vermelho${neg.length > 1 ? ` (${esc(redMonths)})` : ''}. Toque no mês, no gráfico, para ver o porquê.</span>`
     : `<span class="ok-ic">${IC.check}</span><span>Nenhum mês no vermelho, se tudo sair como planejado.</span>`;
+  // modo simples: número, gráfico e itens; divisão da renda, dica e tabela ficam em "Ver mais"
+  const simple = isSimple();
+  const tipHTML = () =>
+    prov.monthly
+      ? `<section class="card tip-card ${reveal()}"><p class="eyebrow">Dica do método</p><h2>Separe ${m0(prov.monthly)} por mês para os gastos anuais</h2>
+      <p>${esc(U.cap(U.listPT(prov.items)))} somam ${m0(prov.total)} nos próximos 12 meses. Guardando um pouco todo mês, numa conta ou “caixinha” separada, o mês do susto vira só mais um mês.</p></section>`
+      : '';
+  const tableHTML = () => `<details class="card table-card ${reveal()}" data-keep="planTable" ${ctx.ui.planTable ? 'open' : ''}>
+      <summary><span class="pg-txt"><b>Tabela mês a mês</b><small>Como na planilha: entra, sai, sobra e acumulado</small></span><span class="chev">${IC.right}</span></summary>
+      <table class="proj-table">
+        <thead><tr><th>Mês</th><th>Entra</th><th>Sai</th><th>Sobra</th><th>Acumulado</th></tr></thead>
+        <tbody>${rows
+          .map(
+            (r) =>
+              `<tr class="${r.saldo < 0 ? 'row-neg' : ''}"><th>${U.monthShortYear(r.mk)}</th><td>${U.num(r.receita)}</td><td>${U.num(r.despesa + r.invest)}</td><td>${r.saldo < 0 ? '<span class="flag-ic crit">!</span>' : ''}${U.num(r.saldo)}</td><td class="${r.acc < 0 ? 'neg' : 'muted'}">${U.num(r.acc)}</td></tr>${r.extras.length ? `<tr class="extras"><td colspan="5">${esc(r.extras.map((l) => l.name).join(' · '))}</td></tr>` : ''}`
+          )
+          .join('')}</tbody>
+      </table>
+      <p class="card-sub">“Sai” inclui o que você guarda. “Acumulado” é a sobra somada mês a mês, se tudo sair como planejado.</p>
+    </details>`;
 
   return `<section class="page-head ${reveal()}"><p class="eyebrow">Planejamento · próximos 12 meses</p><h1>Seu ano, mês a mês</h1></section>
     <section class="card ${reveal()}">
@@ -381,13 +446,7 @@ export function planHTML() {
       <div class="chart-box" data-chart="plan"></div>
       <div class="m-detail" data-month-detail aria-live="polite"></div>
     </section>
-    ${splitCardHTML(st, cm)}
-    ${
-      prov.monthly
-        ? `<section class="card tip-card ${reveal()}"><p class="eyebrow">Dica do método</p><h2>Separe ${m0(prov.monthly)} por mês para os gastos anuais</h2>
-      <p>${esc(U.cap(U.listPT(prov.items)))} somam ${m0(prov.total)} nos próximos 12 meses. Guardando um pouco todo mês, numa conta ou “caixinha” separada, o mês do susto vira só mais um mês.</p></section>`
-        : ''
-    }
+    ${simple ? '' : splitCardHTML(st, cm) + tipHTML()}
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Itens do plano</h2><button class="btn small lime" data-act="line-new">${IC.plus}Adicionar</button></div>
       <p class="card-sub">Toque num grupo para ver e editar os itens.</p>
@@ -405,19 +464,13 @@ export function planHTML() {
         })
         .join('')}</div>
     </section>
-    <details class="card table-card ${reveal()}" data-keep="planTable" ${ctx.ui.planTable ? 'open' : ''}>
-      <summary><span class="pg-txt"><b>Tabela mês a mês</b><small>Como na planilha: entra, sai, sobra e acumulado</small></span><span class="chev">${IC.right}</span></summary>
-      <table class="proj-table">
-        <thead><tr><th>Mês</th><th>Entra</th><th>Sai</th><th>Sobra</th><th>Acumulado</th></tr></thead>
-        <tbody>${rows
-          .map(
-            (r) =>
-              `<tr class="${r.saldo < 0 ? 'row-neg' : ''}"><th>${U.monthShortYear(r.mk)}</th><td>${U.num(r.receita)}</td><td>${U.num(r.despesa + r.invest)}</td><td>${r.saldo < 0 ? '<span class="flag-ic crit">!</span>' : ''}${U.num(r.saldo)}</td><td class="${r.acc < 0 ? 'neg' : 'muted'}">${U.num(r.acc)}</td></tr>${r.extras.length ? `<tr class="extras"><td colspan="5">${esc(r.extras.map((l) => l.name).join(' · '))}</td></tr>` : ''}`
-          )
-          .join('')}</tbody>
-      </table>
-      <p class="card-sub">“Sai” inclui o que você guarda. “Acumulado” é a sobra somada mês a mês, se tudo sair como planejado.</p>
-    </details>`;
+    ${
+      !simple
+        ? tableHTML()
+        : ctx.ui.planMore
+          ? `${splitCardHTML(st, cm)}${tipHTML()}${tableHTML()}<button class="btn ghost wide more-btn" data-act="plan-more">Mostrar menos</button>`
+          : `<button class="btn ghost wide more-btn ${reveal()}" data-act="plan-more">Ver mais: para onde vai a renda e a tabela mês a mês</button>`
+    }`;
 }
 
 // ---------- metas e investimentos ----------
@@ -540,7 +593,7 @@ export function gameHTML() {
     { t: 'Três meses no azul', d: 'Receber mais do que gastar, três vezes.', done: blue >= 3, prog: `${Math.min(3, blue)}/3` },
   ];
 
-  return `<section class="page-head ${reveal()}"><p class="eyebrow">Seu progresso</p><h1>Conquistas</h1></section>
+  return `<button class="link back-link ${reveal()}" data-act="tab" data-tab="metas">${IC.left}Metas</button><section class="page-head ${reveal()}"><p class="eyebrow">Seu progresso</p><h1>Conquistas</h1></section>
     <section class="card level-card ${reveal()}">
       <div class="lv-badge"><span>${lv.level}</span></div>
       <div class="lv-txt"><p class="eyebrow">Nível ${lv.level}</p><h2>${lv.name}</h2>

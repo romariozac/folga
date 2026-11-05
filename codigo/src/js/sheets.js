@@ -519,9 +519,9 @@ export function openCheckin() {
           const all = weekTx.concat(prevMonthTx);
           const cats = st.core.cats.filter((x) => ['mercado', 'comer', 'transporte', 'lazer', 'outros'].includes(x.id));
           body = `<p class="week-sum">Nesta semana: <b>${m0(U.sum(all, (t) => t.v))}</b> em ${U.plural(all.length, 'gasto lançado', 'gastos lançados')}.</p>
-            <p class="card-sub">Faltou algo? Lance um total aproximado por categoria. Nada de caçar centavo.</p>
+            <button type="button" class="imp-drop" data-ck-import><span class="imp-ic">📥</span><span><b>Importe o extrato ou a fatura</b><small>O jeito mais fácil: o app lança tudo e só pergunta as dúvidas</small></span></button>
+            <p class="card-sub">Sem o extrato agora? Lance um total aproximado por categoria. Nada de caçar centavo.</p>
             <div class="catchup">${catchupRowsHTML(cats)}</div>
-            <button type="button" class="imp-drop slim" data-ck-import><span class="imp-ic">📥</span><span><b>Ou importe o extrato</b><small>O app lança tudo e pergunta só as dúvidas</small></span></button>
             <div class="row-btns stick"><button type="button" class="btn ghost" data-next>Pular</button><button type="button" class="btn primary" data-save-next>Lançar e seguir</button></div>`;
         } else {
           const days = U.daysInMonth(mk);
@@ -826,6 +826,7 @@ export function openSettings() {
     <div class="settings form">
       <p class="sync-line">${ic}<span>${txt}</span></p>
       ${warn ? '<p class="warn-box"><span class="flag-ic crit">!</span>Este navegador não está deixando salvar dados. Faça backups ou abra o app por outro navegador.</p>' : ''}
+      <label class="tog simple-tog"><input type="checkbox" name="simple" ${s.simple !== false ? 'checked' : ''}><span><b>Modo simples</b><small>Menos telas: Início, Plano e Metas, com o botão Importar na barra. Desligue para ver tudo: aba Mês, divisão da renda e tabela do plano sempre à mostra.</small></span></label>
       <label class="field"><span>Seu nome</span><input name="name" value="${esc(s.name || '')}" maxlength="30" placeholder="Como quer ser chamado"></label>
       <label class="field"><span>Dia do check-in semanal</span><select name="checkinDay">${U.DIAS.map((d, i) => `<option value="${i}" ${i === (s.checkinDay ?? 0) ? 'selected' : ''}>${U.cap(d)}</option>`).join('')}</select></label>
       <div class="field"><span>Tema</span><div class="seg full" data-seg="theme">${[
@@ -869,6 +870,12 @@ export function openSettings() {
         el.querySelector('[name="checkinDay"]').addEventListener('change', (e) => {
           s.checkinDay = +e.target.value;
           save();
+        });
+        el.querySelector('[name="simple"]').addEventListener('change', (e) => {
+          s.simple = e.target.checked;
+          if (s.simple && ctx.ui.tab === 'mes') ctx.ui.tab = 'inicio';
+          save();
+          toast(s.simple ? 'Modo simples ligado.' : 'Modo completo: todas as telas e detalhes à mostra.');
         });
         el.querySelector('[data-s="import"]').addEventListener('change', async (e) => {
           const file = e.target.files && e.target.files[0];

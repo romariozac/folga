@@ -2195,6 +2195,42 @@ textarea {
   padding: 6px 0;
   border: 0;
 }
+/* modo simples (Ajustes) */
+.simple-tog {
+  align-items: flex-start;
+  background: color-mix(in oklab, var(--lime) 18%, var(--card));
+  border-color: color-mix(in oklab, var(--lime) 55%, var(--line-2));
+}
+.simple-tog input {
+  margin-top: 2px;
+}
+.simple-tog > span {
+  display: grid;
+  gap: 2px;
+}
+.simple-tog small {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.35;
+}
+/* voltar (Mês e Conquistas não ficam na barra) */
+.back-link {
+  margin: 10px 0 -4px;
+  color: var(--ink-2);
+  text-decoration: none;
+  gap: 4px;
+}
+.back-link .ic {
+  width: 18px;
+  height: 18px;
+}
+.more-btn {
+  margin: 4px 0 14px;
+}
+.import-card {
+  background: color-mix(in oklab, var(--lime) 16%, var(--card));
+  border-color: color-mix(in oklab, var(--lime) 50%, var(--line));
+}
 .two {
   display: grid;
   grid-template-columns: 1fr 1fr;

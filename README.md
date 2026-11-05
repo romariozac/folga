@@ -7,11 +7,27 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 > O Folga não é um produto oficial do Gustavo Cerbasi. Ele aplica ideias públicas dele (entrevistas,
 > resumos de livros e a planilha de orçamento doméstico). As fontes estão no fim deste arquivo.
 
+## Modo simples (ligado de início)
+
+Para quem costuma abandonar app de finanças, o app começa no **modo simples**:
+
+- **Três telas:** Início, Plano e Metas. Na barra, no lugar da aba Mês, fica o botão **Importar** (o hábito principal).
+  O previsto x realizado do mês abre pelo **Ver detalhes** do Início.
+- **Menos coisa em cada tela:** no Início, em vez do gráfico, só o aviso dos próximos meses no vermelho; no Plano,
+  o número, o gráfico e os itens (divisão da renda, dica e tabela ficam em **Ver mais**).
+- **Importar como hábito:** uma vez por semana, ou quando a fatura fechar, importe a fatura ou o extrato: o app lança
+  tudo e só pergunta as dúvidas. Se passar uma semana sem importar, o Início lembra, sem bronca. O check-in semanal
+  também começa por aí. Lançar à mão (botão **+**) continua a 2 toques, para quando quiser.
+- **Sem janelas de comemoração:** medalhas, nível e mês no azul aparecem numa linha do aviso, sem interromper. Só a
+  meta alcançada ganha comemoração.
+
+Quer ver tudo? *Ajustes › Modo simples* (desligue): volta a aba Mês e o Plano mostra tudo de uma vez.
+
 ## As telas que respondem o que você pediu
 
 | Pergunta | Onde |
 |---|---|
-| Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. A aba **Mês** mostra previsto x realizado por categoria. |
+| Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. Em **Ver detalhes** (ou na aba **Mês**, no modo completo), o previsto x realizado por categoria. |
 | Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
 | Quanto já guardei e para quê? | **Metas**: o total guardado (reserva, metas e outros investimentos), quanto terá em 12 meses seguindo o plano, cada meta com barra de progresso e ritmo, e a reserva de emergência. |
 | Como me manter animado? | **Conquistas** (toque no seu nível, no topo, ou no atalho da aba Metas): níveis, XP, semanas em dia, medalhas e a “Jornada Cerbasi”. |
@@ -40,7 +56,10 @@ projeção e aparece em “Contas do mês” até o prazo: um toque em **Guardei
 5. **Semanas, não dias.** A sequência conta *semanas* em dia (qualquer lançamento ou o check-in vale), e o
    recorde fica guardado. Isso segue a recomendação (do resumo do livro do Cerbasi) de fazer o controle
    semanal ou quinzenal, não diário.
-6. **Check-in semanal de 2 minutos** (+50 XP): marcar contas, lançar o que faltou (aproximado) e olhar o ritmo do mês.
+6. **Check-in semanal de 2 minutos** (+50 XP): marcar contas, importar o extrato (ou lançar o que faltou, aproximado)
+   e olhar o ritmo do mês.
+7. **Importar em vez de anotar.** Uma importação por semana (ou quando a fatura fecha) resolve o mês; lançar à mão é
+   opcional.
 
 ## Importar extrato e fatura (o app lança sozinho)
 
