@@ -15,6 +15,11 @@ const FALLBACK = { despesa: 'outros', receita: 'outras_rec', invest: 'investir' 
 const TYPE_LABEL = { conta: 'extrato da conta', cartao: 'fatura do cartão' };
 
 const MAX_PRINTS = 12;
+// endereço do app instalável (GitHub Pages), onde a leitura de prints funciona
+const APP_URL = 'https://romariozac.github.io/folga/';
+// No link do Claude a página não pode baixar o leitor de prints (o Claude só libera alguns sites), e ler pelo
+// Claude gastaria seus tokens: lá o botão explica onde ler.
+const printsHere = () => !(window.claude && typeof window.claude.use === 'function');
 
 // Passo a passo por banco (os nomes dos menus mudam de vez em quando).
 const BANK_HELP = {
@@ -147,8 +152,12 @@ export function openImport() {
         ${st.error ? `<div class="warn-box"><span class="flag-ic crit">!</span><div>${esc(st.error)}${st.errorDetail ? `<details class="tech"><summary>Detalhe técnico</summary><code>${esc(st.errorDetail)}</code></details>` : ''}</div></div>` : ''}
         <label class="imp-drop"><input type="file" accept=".ofx,.ofc,.qfx,.csv,.txt,.pdf,.xls,.xlsx,text/csv,text/plain,application/pdf,application/x-ofx" data-file hidden>
           <span class="imp-ic">📄</span><span><b>Escolher arquivo</b><small>OFX ou CSV do banco, PDF ou CSV da fatura</small></span></label>
-        <label class="imp-drop"><input type="file" accept="image/*" multiple data-print hidden>
-          <span class="imp-ic">📸</span><span><b>Ler prints da fatura ou do extrato</b><small>Até ${MAX_PRINTS} imagens. A leitura é feita no seu celular, sem usar o Claude</small></span></label>
+        ${
+          printsHere()
+            ? `<label class="imp-drop"><input type="file" accept="image/*" multiple data-print hidden>
+          <span class="imp-ic">📸</span><span><b>Ler prints da fatura ou do extrato</b><small>Até ${MAX_PRINTS} imagens. A leitura é feita no seu celular, sem usar o Claude</small></span></label>`
+            : `<button type="button" class="imp-drop off" data-print-info><span class="imp-ic">📸</span><span><b>Ler prints da fatura ou do extrato</b><small>Funciona no app instalado (ícone do Folga). Toque para saber como</small></span></button>`
+        }
         <button type="button" class="imp-drop" data-paste-open><span class="imp-ic">📋</span><span><b>Colar o texto</b><small>Copie as linhas do extrato ou da fatura e cole</small></span></button>
         <div data-paste hidden class="form">
           <textarea class="dump" data-paste-text placeholder="05/11 IFOOD *IFOOD 45,90&#10;06/11 UBER *TRIP 12,50&#10;07/11 PIX ENVIADO MARIA 150,00 D"></textarea>
@@ -350,6 +359,12 @@ export function openImport() {
           st.guessed += n;
           regroup();
           vibrate(8);
+          draw();
+          return;
+        }
+        if (t('[data-print-info]')) {
+          st.error = `Os prints são lidos no próprio celular, no app instalado: abra ${APP_URL} no Chrome e toque em ⋮ → Instalar app. Aqui no link do Claude a leitura não roda (e ler pelo Claude gastaria seus tokens). Para levar seus dados: Ajustes → Fazer backup aqui, e Restaurar backup lá.`;
+          st.errorDetail = '';
           draw();
           return;
         }

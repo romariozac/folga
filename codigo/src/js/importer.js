@@ -33,9 +33,8 @@ export function loadScript(src, ms = 20000) {
     document.head.appendChild(s);
   });
 }
-// A mesma versão do pdf.js em três lugares. Na pasta local (app instalado e link do Claude, que agora
-// leva os arquivos junto) ele usa um Web Worker; nos CDNs, o worker entra como script comum e a leitura
-// roda na própria página.
+// A mesma versão do pdf.js em três lugares. Na pasta local (app instalado) ele usa um Web Worker; nos CDNs
+// (link do Claude, que é uma página só), o worker entra como script comum e a leitura roda na própria página.
 const PDF_SOURCES = [
   { base: 'vendor/', main: false, local: true },
   { base: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/', main: true },
@@ -43,10 +42,11 @@ const PDF_SOURCES = [
 ];
 async function getPdfjs() {
   if (pdfLib) return pdfLib;
+  const inClaude = !!(window.claude && typeof window.claude.use === 'function');
   const httpPage = /^https?:$/.test(location.protocol);
   const list = window.__folgaPdfBase
     ? [{ base: window.__folgaPdfBase, main: !!window.__folgaPdfMain }]
-    : PDF_SOURCES.filter((src) => !(src.local && !httpPage));
+    : PDF_SOURCES.filter((src) => !(src.local && (inClaude || !httpPage)));
   pdfLib = (async () => {
     const errs = [];
     for (const src of list) {
