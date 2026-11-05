@@ -51,13 +51,8 @@ function render() {
   view.classList.toggle('animate', ctx.ui.animate);
   ctx.ui.animate = false;
   V.mountCharts(view);
-  const bar = tabbarHTML();
-  if ($('#tabbar').dataset.html !== bar) {
-    $('#tabbar').innerHTML = bar;
-    $('#tabbar').dataset.html = bar;
-  }
-  // no modo simples a aba Mês abre pelo Início; Conquistas abre pela aba Metas
-  const hl = t === 'mes' && V.isSimple() ? 'inicio' : t === 'conquistas' ? 'metas' : t;
+  // Conquistas não fica na barra: abre pelo nível no topo e pela aba Metas (que fica marcada)
+  const hl = t === 'conquistas' ? 'metas' : t;
   $$('#tabbar [data-tab]').forEach((b) => {
     const on = b.dataset.tab === hl;
     b.classList.toggle('on', on);
@@ -87,9 +82,6 @@ function setTab(tab, { scroll = true } = {}) {
 function tabbarHTML() {
   const item = (tab, icon, label) => `<button class="tab" data-act="tab" data-tab="${tab}">${icon}<span>${label}</span></button>`;
   const fab = `<button class="fab" data-act="add" aria-label="Novo lançamento">${IC.plus}</button>`;
-  // modo simples: três telas e, no lugar da aba Mês, o hábito principal (importar a fatura ou o extrato)
-  if (V.isSimple())
-    return `${item('inicio', IC.home, 'Início')}${item('plano', IC.plan, 'Plano')}${fab}${item('metas', IC.target, 'Metas')}<button class="tab" data-act="import">${IC.download}<span>Importar</span></button>`;
   return `${item('inicio', IC.home, 'Início')}${item('mes', IC.month, 'Mês')}${fab}${item('plano', IC.plan, 'Plano')}${item('metas', IC.target, 'Metas')}`;
 }
 

@@ -826,7 +826,7 @@ export function openSettings() {
     <div class="settings form">
       <p class="sync-line">${ic}<span>${txt}</span></p>
       ${warn ? '<p class="warn-box"><span class="flag-ic crit">!</span>Este navegador não está deixando salvar dados. Faça backups ou abra o app por outro navegador.</p>' : ''}
-      <label class="tog simple-tog"><input type="checkbox" name="simple" ${s.simple !== false ? 'checked' : ''}><span><b>Modo simples</b><small>Menos telas: Início, Plano e Metas, com o botão Importar na barra. Desligue para ver tudo: aba Mês, divisão da renda e tabela do plano sempre à mostra.</small></span></label>
+      <label class="tog simple-tog"><input type="checkbox" name="simple" ${s.simple !== false ? 'checked' : ''}><span><b>Modo simples</b><small>Menos coisa em cada tela: no Início, só o aviso dos meses no vermelho, sem o gráfico; no Plano, a divisão da renda e a tabela ficam em “Ver mais”. Desligue para ver tudo sempre à mostra.</small></span></label>
       <label class="field"><span>Seu nome</span><input name="name" value="${esc(s.name || '')}" maxlength="30" placeholder="Como quer ser chamado"></label>
       <label class="field"><span>Dia do check-in semanal</span><select name="checkinDay">${U.DIAS.map((d, i) => `<option value="${i}" ${i === (s.checkinDay ?? 0) ? 'selected' : ''}>${U.cap(d)}</option>`).join('')}</select></label>
       <div class="field"><span>Tema</span><div class="seg full" data-seg="theme">${[
@@ -873,9 +873,8 @@ export function openSettings() {
         });
         el.querySelector('[name="simple"]').addEventListener('change', (e) => {
           s.simple = e.target.checked;
-          if (s.simple && ctx.ui.tab === 'mes') ctx.ui.tab = 'inicio';
           save();
-          toast(s.simple ? 'Modo simples ligado.' : 'Modo completo: todas as telas e detalhes à mostra.');
+          toast(s.simple ? 'Modo simples ligado.' : 'Modo completo: todos os detalhes à mostra.');
         });
         el.querySelector('[data-s="import"]').addEventListener('change', async (e) => {
           const file = e.target.files && e.target.files[0];

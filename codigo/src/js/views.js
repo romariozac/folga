@@ -62,12 +62,11 @@ export const isSimple = () => S().core.settings.simple !== false;
 function monthCardHTML(c, hasPlan) {
   const hero = hasPlan ? c.saldoExp : c.saldoReal;
   const inv = c.prev.invest || c.real.invest;
-  const simple = isSimple();
   return `<section class="card month-card ${reveal()}">
-    <div class="card-head"><span class="eyebrow">${U.cap(U.monthName(c.mk))} · este mês</span><button class="link" data-act="tab" data-tab="mes">${simple ? 'Ver detalhes' : 'Previsto x realizado'} ${IC.right}</button></div>
+    <div class="card-head"><span class="eyebrow">${U.cap(U.monthName(c.mk))} · este mês</span><button class="link" data-act="tab" data-tab="mes">Previsto x realizado ${IC.right}</button></div>
     <p class="hero-label">${hasPlan ? 'Previsão de sobra no fim do mês' : 'Saldo do mês até agora'}</p>
     <p class="hero ${hero < 0 ? 'neg' : ''}">${heroMoney(hero)}</p>
-    <p class="hero-sub">${hasPlan ? (hero < 0 ? `<span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho. ${simple ? 'Toque em “Ver detalhes” para ver onde ajustar.' : 'Veja onde ajustar na aba Mês.'}` : 'Se o resto do mês seguir o plano.') : 'Monte o plano para ver a previsão do mês.'}</p>
+    <p class="hero-sub">${hasPlan ? (hero < 0 ? '<span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho. Veja onde ajustar na aba Mês.' : 'Se o resto do mês seguir o plano.') : 'Monte o plano para ver a previsão do mês.'}</p>
     <div class="tiles">${tile('in', 'Entrou', c.real.receita, c.prev.receita)}${tile('out', 'Gastou', c.real.despesa, c.prev.despesa)}</div>
     ${inv ? `<div class="invest-row"><i class="sw inv"></i><span class="inv-txt"><small>Pague-se primeiro</small><span>Guardou <b>${m0(c.real.invest)}</b>${c.prev.invest ? ` de ${m0(c.prev.invest)}` : ''}</span></span>${c.prev.invest && c.real.invest >= c.prev.invest ? `<span class="ok">${IC.check}</span>` : ''}</div>` : ''}
   </section>`;
@@ -313,8 +312,7 @@ export function monthHTML() {
   for (const t of c.txs) (byDay[t.d] ||= []).push({ ...t, mk });
   const days = Object.keys(byDay).sort().reverse();
 
-  // no modo simples a aba Mês não fica na barra: ela abre pelo Início e tem o caminho de volta
-  return `${isSimple() ? `<button class="link back-link ${reveal()}" data-act="tab" data-tab="inicio">${IC.left}Início</button>` : ''}<section class="month-nav ${reveal()}">
+  return `<section class="month-nav ${reveal()}">
       <button class="icon-btn" data-act="mk-prev" aria-label="Mês anterior">${IC.left}</button>
       <div><p class="eyebrow">${isCur ? 'Este mês' : mk > cm ? 'Mês futuro · só previsto' : 'Mês passado'}</p><h1>${U.monthLabel(mk)}</h1></div>
       <button class="icon-btn" data-act="mk-next" aria-label="Próximo mês">${IC.right}</button>

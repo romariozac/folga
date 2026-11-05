@@ -11,23 +11,23 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 
 Para quem costuma abandonar app de finanças, o app começa no **modo simples**:
 
-- **Três telas:** Início, Plano e Metas. Na barra, no lugar da aba Mês, fica o botão **Importar** (o hábito principal).
-  O previsto x realizado do mês abre pelo **Ver detalhes** do Início.
 - **Menos coisa em cada tela:** no Início, em vez do gráfico, só o aviso dos próximos meses no vermelho; no Plano,
-  o número, o gráfico e os itens (divisão da renda, dica e tabela ficam em **Ver mais**).
+  o número, o gráfico e os itens (divisão da renda, dica e tabela ficam em **Ver mais**). A barra continua a mesma:
+  Início, Mês, **+**, Plano e Metas.
 - **Importar como hábito:** uma vez por semana, ou quando a fatura fechar, importe a fatura ou o extrato: o app lança
   tudo e só pergunta as dúvidas. Se passar uma semana sem importar, o Início lembra, sem bronca. O check-in semanal
   também começa por aí. Lançar à mão (botão **+**) continua a 2 toques, para quando quiser.
 - **Sem janelas de comemoração:** medalhas, nível e mês no azul aparecem numa linha do aviso, sem interromper. Só a
   meta alcançada ganha comemoração.
 
-Quer ver tudo? *Ajustes › Modo simples* (desligue): volta a aba Mês e o Plano mostra tudo de uma vez.
+Quer ver tudo? *Ajustes › Modo simples* (desligue): o Início volta a ter o gráfico dos próximos meses e o Plano mostra
+tudo de uma vez.
 
 ## As telas que respondem o que você pediu
 
 | Pergunta | Onde |
 |---|---|
-| Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. Em **Ver detalhes** (ou na aba **Mês**, no modo completo), o previsto x realizado por categoria. |
+| Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. A aba **Mês** mostra previsto x realizado por categoria. |
 | Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
 | Quanto já guardei e para quê? | **Metas**: o total guardado (reserva, metas e outros investimentos), quanto terá em 12 meses seguindo o plano, cada meta com barra de progresso e ritmo, e a reserva de emergência. |
 | Como me manter animado? | **Conquistas** (toque no seu nível, no topo, ou no atalho da aba Metas): níveis, XP, semanas em dia, medalhas e a “Jornada Cerbasi”. |
