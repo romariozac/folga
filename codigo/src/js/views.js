@@ -31,11 +31,9 @@ export const legendHTML = () =>
 export function topbarHTML() {
   const g = S().core.game;
   const lv = G.levelOf(g.xp);
-  const sk = G.streakOf(S().core, today());
   return `
   <button class="brand" data-act="tab" data-tab="inicio" aria-label="Folga, início"><span class="brand-mark">f</span><span class="brand-word">folga</span></button>
   <div class="top-actions">
-    ${sk.current ? `<button class="chip" data-act="tab" data-tab="conquistas" aria-label="${sk.current} semanas em dia">🔥<b>${sk.current}</b></button>` : ''}
     <button class="chip chip-level" data-act="tab" data-tab="conquistas" aria-label="Nível ${lv.level}, ${g.xp} XP">
       <span class="ring" style="--p:${Math.round(lv.pct * 100)}"><span>${lv.level}</span></span><b>${g.xp}</b><span class="xp-unit">XP</span>
     </button>
@@ -44,39 +42,31 @@ export function topbarHTML() {
 }
 
 // ---------- início ----------
-function tile(kind, label, real, prev) {
-  const pct = prev ? Math.round((real / prev) * 100) : 0;
-  const over = kind === 'out' && prev && real > prev;
-  return `<div class="tile ${kind}">
-    <span class="tile-label"><i class="sw ${kind}"></i>${label}</span>
-    <b class="tile-value">${m0(real)}</b>
-    <span class="tile-prev">${prev ? `de ${m0(prev)} previstos` : 'sem previsão'}</span>
-    <div class="meter ${kind}" role="img" aria-label="${prev ? pct + '% do previsto' : 'sem previsão'}"><i style="width:${Math.min(100, pct)}%"></i></div>
-    ${over ? `<span class="tile-flag"><span class="flag-ic crit">!</span>${m0(real - prev)} acima</span>` : ''}
-  </div>`;
-}
-
-/** Modo simples (padrão): menos telas e menos coisa em cada tela. */
-export const isSimple = () => S().core.settings.simple !== false;
-
+/** O mês num olhar: a sobra prevista e quanto já foi gasto do previsto. O detalhe (previsto x realizado) fica na aba Mês. */
 function monthCardHTML(c, hasPlan) {
   const hero = hasPlan ? c.saldoExp : c.saldoReal;
-  const inv = c.prev.invest || c.real.invest;
+  const spent = c.real.despesa;
+  const prev = c.prev.despesa;
+  const pct = prev ? Math.round((spent / prev) * 100) : 0;
+  const over = prev > 0 && spent > prev;
   return `<section class="card month-card ${reveal()}">
-    <div class="card-head"><span class="eyebrow">${U.cap(U.monthName(c.mk))} · este mês</span><button class="link" data-act="tab" data-tab="mes">Previsto x realizado ${IC.right}</button></div>
-    <p class="hero-label">${hasPlan ? 'Previsão de sobra no fim do mês' : 'Saldo do mês até agora'}</p>
+    <p class="eyebrow">${U.cap(U.monthName(c.mk))}</p>
+    <p class="hero-label">${hasPlan ? 'Sobra prevista no fim do mês' : 'Saldo do mês até agora'}</p>
     <p class="hero ${hero < 0 ? 'neg' : ''}">${heroMoney(hero)}</p>
-    <p class="hero-sub">${hasPlan ? (hero < 0 ? '<span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho. Veja onde ajustar na aba Mês.' : 'Se o resto do mês seguir o plano.') : 'Monte o plano para ver a previsão do mês.'}</p>
-    <div class="tiles">${tile('in', 'Entrou', c.real.receita, c.prev.receita)}${tile('out', 'Gastou', c.real.despesa, c.prev.despesa)}</div>
-    ${inv ? `<div class="invest-row"><i class="sw inv"></i><span class="inv-txt"><small>Pague-se primeiro</small><span>Guardou <b>${m0(c.real.invest)}</b>${c.prev.invest ? ` de ${m0(c.prev.invest)}` : ''}</span></span>${c.prev.invest && c.real.invest >= c.prev.invest ? `<span class="ok">${IC.check}</span>` : ''}</div>` : ''}
+    ${hasPlan && hero < 0 ? '<p class="hero-sub"><span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho.</p>' : ''}
+    ${
+      prev
+        ? `<div class="spent"><span>Gastou <b>${m0(spent)}</b> de ${m0(prev)}</span>${over ? `<span class="tile-flag"><span class="flag-ic crit">!</span>${m0(spent - prev)} acima</span>` : ''}</div>
+    <div class="meter out" role="img" aria-label="${pct}% do previsto"><i style="width:${Math.min(100, pct)}%"></i></div>`
+        : ''
+    }
   </section>`;
 }
 
 function planCTAHTML() {
   return `<section class="card cta-card ${reveal()}">
-    <p class="eyebrow">Comece por aqui</p>
     <h2>Monte seu plano em 2 minutos</h2>
-    <p>Renda, contas fixas, gastos do dia a dia e os “sustos do ano” (IPVA, IPTU, material escolar). O app projeta os próximos 12 meses, como a planilha do Cerbasi.</p>
+    <p>Renda, contas e os gastos do ano: o app projeta os próximos 12 meses.</p>
     <button class="btn primary" data-act="onboarding">Montar meu plano</button>
   </section>`;
 }
@@ -86,7 +76,7 @@ function comebackHTML(gap) {
     <span class="note-emo">🪃</span>
     <div>
       <h2>${gap} dias sem lançar? Tudo bem.</h2>
-      <p>Não precisa lembrar de tudo. Importe o extrato (o app lança sozinho) ou faça um acerto aproximado.${gap >= G.COMEBACK_DAYS ? ' Voltar vale <b>+30 XP</b>.' : ''}</p>
+      <p>Importe o extrato ou faça um acerto aproximado.${gap >= G.COMEBACK_DAYS ? ' Voltar vale <b>+30 XP</b>.' : ''}</p>
       <div class="row-btns"><button class="btn primary" data-act="import">Importar extrato</button><button class="btn ghost" data-act="catchup">Acerto rápido</button></div>
       <button class="link" data-act="fresh-start">Só seguir daqui</button>
     </div>
@@ -104,7 +94,7 @@ function checkinCardHTML() {
     <span class="note-emo">📋</span>
     <div>
       <h2>Check-in da semana</h2>
-      <p>Uns 2 minutos: contas, o que faltou lançar e uma olhada no mês. Cerbasi sugere controle semanal ou quinzenal, não diário. <b>+50 XP</b></p>
+      <p>2 minutos: contas, extrato e uma olhada no mês. <b>+50 XP</b></p>
       <button class="btn lime" data-act="checkin">Fazer check-in</button>
     </div>
   </section>`;
@@ -146,32 +136,8 @@ function billsHTML(c) {
   const list = exp ? c.bills : c.bills.slice(0, 5);
   return `<section class="card ${reveal()}">
     <div class="card-head"><h2>Contas do mês</h2><span class="pill">${done} de ${c.bills.length}</span></div>
-    <p class="card-sub">Vêm do seu plano. Um toque e está marcado.</p>
     <ul class="bills">${list.map((b) => billRowHTML(b, c.mk)).join('')}</ul>
     ${c.bills.length > 5 ? `<button class="link more" data-act="bills-expand">${exp ? 'Mostrar menos' : `Ver todas (${c.bills.length})`}</button>` : ''}
-  </section>`;
-}
-
-function alertsHTML(rows, max = 2) {
-  const neg = rows.filter((r) => r.saldo < 0);
-  if (!neg.length) return `<p class="ok-line">${IC.check} Nenhum mês no vermelho à vista.</p>`;
-  return `<ul class="alerts">${neg
-    .slice(0, max)
-    .map(
-      (r) =>
-        `<li><span class="flag-ic crit">!</span><span><b>${U.cap(U.monthName(r.mk))}</b>: saídas maiores que entradas (${m0(r.saldo)})${r.extras.length ? `, por causa de ${esc(U.listPT(r.extras.map((l) => l.name).slice(0, 3)))}` : ''}.</span></li>`
-    )
-    .join('')}${neg.length > max ? `<li class="muted">e mais ${neg.length - max} ${neg.length - max === 1 ? 'mês' : 'meses'}.</li>` : ''}</ul>`;
-}
-
-function projPreviewHTML() {
-  const rows = M.projection(S(), curMk(), 6);
-  return `<section class="card ${reveal()}">
-    <div class="card-head"><h2>Próximos 6 meses</h2><button class="link" data-act="tab" data-tab="plano">Plano completo ${IC.right}</button></div>
-    <p class="card-sub">Quanto vai entrar e sair, pelo seu plano. Toque numa coluna para ver os valores.</p>
-    ${legendHTML()}
-    <div class="chart-box" data-chart="home"></div>
-    ${alertsHTML(rows)}
   </section>`;
 }
 
@@ -188,46 +154,25 @@ export function txRowHTML(t) {
 }
 
 // ---------- importar: o hábito principal ----------
-const sinceImport = () => {
+/** Sem importar há 7 dias (ou nunca): o lembrete aparece no Início. */
+function importDays() {
   const last = S().core.settings.lastImport;
   return last ? U.daysBetween(last, today()) : null;
-};
-const whenText = (d) => (d === 0 ? 'hoje' : d === 1 ? 'ontem' : `há ${d} dias`);
-/** Sem importar há 7 dias (ou nunca): o lembrete fica em destaque no Início. */
+}
 const importDue = () => {
-  const d = sinceImport();
+  const d = importDays();
   return d == null || d >= 7;
 };
 
 function importCardHTML() {
-  const d = sinceImport();
+  const d = importDays();
   return `<section class="card note-card import-card ${reveal()}">
     <span class="note-emo">📥</span>
     <div>
-      <h2>${d == null ? 'Importe a fatura ou o extrato' : `Última importação: ${whenText(d)}`}</h2>
-      <p>${d == null ? 'É o jeito mais fácil de manter tudo em dia: o app lança sozinho e só pergunta 2 ou 3 dúvidas.' : 'Hora de importar de novo: o app lança tudo sozinho e só pergunta as dúvidas.'} Uma vez por semana, ou quando a fatura fechar, basta.</p>
+      <h2>${d == null ? 'Importe a fatura ou o extrato' : `Faz ${d} dias da última importação`}</h2>
+      <p>O app lança tudo sozinho e só pergunta as dúvidas.</p>
       <button class="btn lime" data-act="import">Importar agora</button>
     </div>
-  </section>`;
-}
-
-function recentHTML({ importRow = true, n = 6 } = {}) {
-  const list = M.recentTx(S(), n);
-  const d = sinceImport();
-  return `<section class="card ${reveal()}">
-    <div class="card-head"><h2>Últimos lançamentos</h2>${list.length ? `<button class="link" data-act="tab" data-tab="mes">Ver o mês ${IC.right}</button>` : ''}</div>
-    ${list.length ? `<ul class="txs">${list.map(txRowHTML).join('')}</ul>` : `<div class="empty"><p>Nada lançado ainda. Importe a fatura ou o extrato (o app lança sozinho) ou toque no <b>+</b> para lançar à mão.</p></div>`}
-    ${importRow ? `<button class="imp-drop slim" data-act="import"><span class="imp-ic">📥</span><span><b>Importar extrato ou fatura</b><small>${d == null ? 'O app lança sozinho e só pergunta as dúvidas' : `Última importação: ${whenText(d)}`}</small></span></button>` : ''}
-  </section>`;
-}
-
-/** Modo simples: em vez do gráfico, só o aviso dos próximos meses no vermelho (o gráfico fica no Plano). */
-function nextMonthsHTML() {
-  const neg = M.projection(S(), curMk(), 6).filter((r) => r.saldo < 0);
-  if (!neg.length) return '';
-  return `<section class="card ${reveal()}">
-    <div class="card-head"><h2>Próximos meses</h2><button class="link" data-act="tab" data-tab="plano">Ver no Plano ${IC.right}</button></div>
-    ${alertsHTML(neg, 2)}
   </section>`;
 }
 
@@ -240,19 +185,14 @@ export function homeHTML() {
   const gap = g.lastActive ? U.daysBetween(g.lastActive, today()) : null;
   const sk = G.streakOf(st.core, today());
   const name = st.core.settings.name;
-  const simple = isSimple();
-  const comeback = gap !== null && gap >= 2;
-  // o lembrete de importar aparece em destaque quando está na hora (a volta depois de uma pausa já oferece importar)
-  const importTop = importDue() && !comeback;
   let h = `<section class="hello ${reveal()}"><p class="eyebrow">${U.longDate(today())}</p><h1>${greeting()}${name ? `, ${esc(name)}` : ''}</h1></section>`;
   if (!hasPlan) h += planCTAHTML();
   h += monthCardHTML(c, hasPlan);
-  if (comeback) h += comebackHTML(gap);
-  else if (importTop) h += importCardHTML();
+  // um aviso por vez: a volta depois de uma pausa, a hora de importar ou o check-in da semana
+  if (gap !== null && gap >= 2) h += comebackHTML(gap);
+  else if (importDue()) h += importCardHTML();
   else if (!sk.checkinThisWeek && checkinWindow() && g.lastActive) h += checkinCardHTML();
   if (c.bills.length) h += billsHTML(c);
-  if (hasPlan) h += simple ? nextMonthsHTML() : projPreviewHTML();
-  h += recentHTML({ importRow: !importTop, n: simple ? 4 : 6 });
   return h;
 }
 
@@ -264,7 +204,6 @@ export function monthHTML() {
   const c = M.monthCalc(st, mk);
   const cm = curMk();
   const isCur = mk === cm;
-  const hasPlan = st.core.plan.length > 0;
   const tr = (cls, label, p, r) => `<tr><th><i class="sw ${cls}"></i>${label}</th><td>${m0(p)}</td><td><b>${m0(r)}</b></td></tr>`;
 
   const cats = Object.values(c.byCat)
@@ -323,11 +262,10 @@ export function monthHTML() {
         <tbody>${tr('in', 'Entradas', c.prev.receita, c.real.receita)}${tr('out', 'Despesas', c.prev.despesa, c.real.despesa)}${tr('inv', 'Investimento', c.prev.invest, c.real.invest)}</tbody>
         <tfoot><tr><th>Saldo</th><td class="${c.saldoPrev < 0 ? 'neg' : ''}">${m0(c.saldoPrev)}</td><td class="${c.saldoReal < 0 ? 'neg' : ''}"><b>${m0(c.saldoReal)}</b></td></tr></tfoot>
       </table>
-      ${isCur && hasPlan ? `<p class="card-sub">Previsão de sobra no fim do mês: <b class="${c.saldoExp < 0 ? 'neg' : ''}">${money(c.saldoExp)}</b>.</p>` : ''}
     </section>
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Gastos por categoria</h2></div>
-      <p class="card-sub">A barra é quanto já foi; o traço é o previsto no plano. Toque no nome para ver os detalhes.</p>
+      <p class="card-sub">Barra: quanto já foi. Traço: o previsto.</p>
       ${bullets ? `<ul class="bullets">${bullets}</ul>` : `<div class="empty"><p>Sem gastos previstos ou lançados neste mês.</p></div>`}
     </section>
     <section class="card ${reveal()}">
@@ -348,7 +286,7 @@ function planItemHTML(l) {
   </button></li>`;
 }
 
-/** Barra fina dividida em partes, sem texto: a lista logo abaixo traz nome e valor de cada parte. */
+/** Barra fina dividida em partes, sem texto: as linhas logo abaixo trazem nome e valor de cada parte. */
 function splitBarHTML(parts, label) {
   const shown = parts.filter((p) => p.v > 0);
   if (!shown.length) return '';
@@ -357,86 +295,43 @@ function splitBarHTML(parts, label) {
   return `<div class="split-bar" role="img" aria-label="${esc(`${label}. ${desc}`)}">${shown.map((p) => `<i class="${p.cls}" style="flex-grow:${p.v}"></i>`).join('')}</div>`;
 }
 
-/** Média mensal do plano: contas fixas, dia a dia, anuais, guardar e o que sobra (em % da renda). */
-function splitCardHTML(st, cm) {
-  const s = M.planSplit(st, cm);
-  const out = s.fixas + s.verbas + s.anuais + s.guardar;
-  if (!s.renda && !out) return '';
-  const parts = [
-    { cls: 'p-fixas', name: 'Contas fixas', v: s.fixas },
-    { cls: 'p-verbas', name: 'Dia a dia', v: s.verbas },
-    { cls: 'p-anuais', name: 'Anuais e parcelas', v: s.anuais },
-    { cls: 'p-guardar', name: 'Guardar', v: s.guardar },
-    { cls: 'p-sobra', name: 'Sobra livre', v: Math.max(0, s.sobra) },
-  ];
-  const pct = (v) => (s.renda > 0 ? `${Math.round((v / s.renda) * 100)}%` : '');
-  return `<section class="card ${reveal()}">
-    <div class="card-head"><h2>Para onde vai a renda</h2><span class="pill">média por mês</span></div>
-    <p class="card-sub">Renda prevista: <b>${m0(s.renda)}</b> por mês, nos próximos 12 meses.</p>
-    ${splitBarHTML(parts, 'Para onde vai a renda, média por mês')}
-    <ul class="split-list">${parts
-      .filter((p) => p.v > 0)
-      .map((p) => `<li><i class="sw ${p.cls}"></i><span>${p.name}</span><b>${m0(p.v)}</b><small>${pct(p.v)}</small></li>`)
-      .join('')}</ul>
-    ${s.sobra < 0 ? `<p class="warn-line"><span class="flag-ic crit">!</span><span>Em média, saem <b>${m0(-s.sobra)}</b> a mais do que entra por mês.</span></p>` : ''}
-  </section>`;
-}
-
 export function planHTML() {
   rv = 0;
   const st = S();
   const plan = st.core.plan;
-  if (!plan.length) {
-    return `<section class="page-head ${reveal()}"><p class="eyebrow">Planejamento</p><h1>Seu ano, mês a mês</h1>
-      <p class="lede">No método do Gustavo Cerbasi, orçamento é projetar o que vem pela frente: tudo o que vai entrar e sair nos próximos meses, inclusive os gastos que só aparecem uma vez por ano.</p></section>
-      ${planCTAHTML()}`;
-  }
+  if (!plan.length) return planCTAHTML();
   const cm = curMk();
   const rows = M.projection(st, cm, 12);
   const last = rows[rows.length - 1];
   const neg = rows.filter((r) => r.saldo < 0);
-  const prov = M.seasonalProvision(st, cm);
+  const s = M.planSplit(st, cm);
+  const pct = (v) => (s.renda > 0 ? `${Math.round((v / s.renda) * 100)}%` : '');
+  // os grupos do plano são as partes da renda: a mesma cor na barra e na linha do grupo
   const groups = [
-    { id: 'receita', title: 'Receitas', items: plan.filter((l) => l.kind === 'receita') },
-    { id: 'metas', title: 'Metas', items: plan.filter((l) => l.kind === 'invest' && l.goal) },
-    { id: 'pague', title: 'Pague-se primeiro', items: plan.filter((l) => l.kind === 'invest' && !l.goal) },
-    { id: 'fixas', title: 'Contas fixas', items: plan.filter((l) => l.kind === 'despesa' && l.type !== 'verba' && l.rec === 'mensal') },
-    { id: 'verbas', title: 'Verbas do dia a dia', items: plan.filter((l) => l.kind === 'despesa' && l.type === 'verba') },
-    { id: 'anuais', title: 'Anuais, parcelas e únicos', items: plan.filter((l) => l.kind === 'despesa' && l.type !== 'verba' && l.rec !== 'mensal') },
-  ];
-  // quanto o grupo pesa: por mês (itens mensais) ou somado nos próximos 12 meses (anuais e parcelas)
-  const in12 = (l) => U.sum(rows, (r) => (M.occurs(l, r.mk) ? l.amount : 0));
-  const weight = (items) => {
-    const mm = U.sum(items.filter((l) => l.rec === 'mensal'), (l) => l.amount);
-    return mm ? `${m0(mm)}/mês` : `${m0(U.sum(items, in12))} em 12 meses`;
+    { id: 'receita', cls: 'in', name: 'Renda', v: s.renda, items: plan.filter((l) => l.kind === 'receita') },
+    { id: 'fixas', cls: 'p-fixas', name: 'Contas fixas', v: s.fixas, items: plan.filter((l) => l.kind === 'despesa' && l.type !== 'verba' && l.rec === 'mensal') },
+    { id: 'verbas', cls: 'p-verbas', name: 'Dia a dia', v: s.verbas, items: plan.filter((l) => l.kind === 'despesa' && l.type === 'verba') },
+    { id: 'anuais', cls: 'p-anuais', name: 'Anuais e parcelas', v: s.anuais, sub: 'separe esse valor todo mês', items: plan.filter((l) => l.kind === 'despesa' && l.type !== 'verba' && l.rec !== 'mensal') },
+    { id: 'guardar', cls: 'p-guardar', name: 'Guardar', v: s.guardar, items: plan.filter((l) => l.kind === 'invest') },
+  ].filter((g) => g.items.length);
+  const groupHTML = (gr) => {
+    const open = ctx.ui.planOpen.has(gr.id);
+    return `<div class="pg${open ? ' open' : ''}">
+      <button class="pg-head" data-act="plan-group" data-id="${gr.id}" aria-expanded="${open}">
+        <i class="sw ${gr.cls}"></i><span class="pg-txt"><b>${gr.name}</b><small>${gr.sub || U.plural(gr.items.length, 'item', 'itens')}</small></span>
+        <span class="pg-amt">${m0(gr.v)}${gr.id === 'receita' ? '' : `<small>${pct(gr.v)}</small>`}</span><span class="chev ${open ? 'up' : ''}">${IC.right}</span>
+      </button>
+      ${open ? `<ul class="pl-list">${gr.items.map(planItemHTML).join('')}</ul>` : ''}
+    </div>`;
   };
+  const parts = [...groups.filter((g) => g.id !== 'receita').map((g) => ({ cls: g.cls, name: g.name, v: g.v })), { cls: 'p-sobra', name: 'Sobra livre', v: Math.max(0, s.sobra) }];
+  const sobraRow = `<div class="pg pg-static"><div class="pg-head"><i class="sw p-sobra"></i><span class="pg-txt"><b>${s.sobra < 0 ? 'Falta' : 'Sobra livre'}</b></span><span class="pg-amt ${s.sobra < 0 ? 'neg' : ''}">${m0(Math.abs(s.sobra))}<small>${s.sobra < 0 ? '' : pct(s.sobra)}</small></span><span class="chev-space"></span></div></div>`;
   const redMonths = neg.length > 4 ? `${neg.slice(0, 3).map((r) => U.monthShortYear(r.mk)).join(', ')} e mais ${neg.length - 3}` : U.listPT(neg.map((r) => U.monthShortYear(r.mk)));
   const redText = neg.length
-    ? `<span class="flag-ic crit">!</span><span>${neg.length === 1 ? `${U.cap(U.monthName(neg[0].mk))} fecha` : `${neg.length} meses fecham`} no vermelho${neg.length > 1 ? ` (${esc(redMonths)})` : ''}. Toque no mês, no gráfico, para ver o porquê.</span>`
-    : `<span class="ok-ic">${IC.check}</span><span>Nenhum mês no vermelho, se tudo sair como planejado.</span>`;
-  // modo simples: número, gráfico e itens; divisão da renda, dica e tabela ficam em "Ver mais"
-  const simple = isSimple();
-  const tipHTML = () =>
-    prov.monthly
-      ? `<section class="card tip-card ${reveal()}"><p class="eyebrow">Dica do método</p><h2>Separe ${m0(prov.monthly)} por mês para os gastos anuais</h2>
-      <p>${esc(U.cap(U.listPT(prov.items)))} somam ${m0(prov.total)} nos próximos 12 meses. Guardando um pouco todo mês, numa conta ou “caixinha” separada, o mês do susto vira só mais um mês.</p></section>`
-      : '';
-  const tableHTML = () => `<details class="card table-card ${reveal()}" data-keep="planTable" ${ctx.ui.planTable ? 'open' : ''}>
-      <summary><span class="pg-txt"><b>Tabela mês a mês</b><small>Como na planilha: entra, sai, sobra e acumulado</small></span><span class="chev">${IC.right}</span></summary>
-      <table class="proj-table">
-        <thead><tr><th>Mês</th><th>Entra</th><th>Sai</th><th>Sobra</th><th>Acumulado</th></tr></thead>
-        <tbody>${rows
-          .map(
-            (r) =>
-              `<tr class="${r.saldo < 0 ? 'row-neg' : ''}"><th>${U.monthShortYear(r.mk)}</th><td>${U.num(r.receita)}</td><td>${U.num(r.despesa + r.invest)}</td><td>${r.saldo < 0 ? '<span class="flag-ic crit">!</span>' : ''}${U.num(r.saldo)}</td><td class="${r.acc < 0 ? 'neg' : 'muted'}">${U.num(r.acc)}</td></tr>${r.extras.length ? `<tr class="extras"><td colspan="5">${esc(r.extras.map((l) => l.name).join(' · '))}</td></tr>` : ''}`
-          )
-          .join('')}</tbody>
-      </table>
-      <p class="card-sub">“Sai” inclui o que você guarda. “Acumulado” é a sobra somada mês a mês, se tudo sair como planejado.</p>
-    </details>`;
+    ? `<span class="flag-ic crit">!</span><span>${esc(redMonths)} ${neg.length === 1 ? 'fecha' : 'fecham'} no vermelho. Toque no mês para ver o porquê.</span>`
+    : `<span class="ok-ic">${IC.check}</span><span>Nenhum mês no vermelho.</span>`;
 
-  return `<section class="page-head ${reveal()}"><p class="eyebrow">Planejamento · próximos 12 meses</p><h1>Seu ano, mês a mês</h1></section>
-    <section class="card ${reveal()}">
+  return `<section class="card ${reveal()}">
       <p class="hero-label">Sobra acumulada em 12 meses</p>
       <p class="hero ${last.acc < 0 ? 'neg' : ''}">${heroMoney(last.acc, { cents: false })}</p>
       <p class="hero-sub">${redText}</p>
@@ -444,69 +339,55 @@ export function planHTML() {
       <div class="chart-box" data-chart="plan"></div>
       <div class="m-detail" data-month-detail aria-live="polite"></div>
     </section>
-    ${simple ? '' : splitCardHTML(st, cm) + tipHTML()}
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Itens do plano</h2><button class="btn small lime" data-act="line-new">${IC.plus}Adicionar</button></div>
-      <p class="card-sub">Toque num grupo para ver e editar os itens.</p>
-      <div class="pg-list">${groups
-        .filter((gr) => gr.items.length)
-        .map((gr) => {
-          const open = ctx.ui.planOpen.has(gr.id);
-          return `<div class="pg${open ? ' open' : ''}">
-            <button class="pg-head" data-act="plan-group" data-id="${gr.id}" aria-expanded="${open}">
-              <span class="pg-txt"><b>${gr.title}</b><small>${U.plural(gr.items.length, 'item', 'itens')}</small></span>
-              <span class="pg-amt">${weight(gr.items)}</span><span class="chev ${open ? 'up' : ''}">${IC.right}</span>
-            </button>
-            ${open ? `<ul class="pl-list">${gr.items.map(planItemHTML).join('')}</ul>` : ''}
-          </div>`;
-        })
-        .join('')}</div>
-    </section>
-    ${
-      !simple
-        ? tableHTML()
-        : ctx.ui.planMore
-          ? `${splitCardHTML(st, cm)}${tipHTML()}${tableHTML()}<button class="btn ghost wide more-btn" data-act="plan-more">Mostrar menos</button>`
-          : `<button class="btn ghost wide more-btn ${reveal()}" data-act="plan-more">Ver mais: para onde vai a renda e a tabela mês a mês</button>`
-    }`;
+      <p class="eyebrow pg-eyebrow">Média por mês</p>
+      ${splitBarHTML(parts, 'Para onde vai a renda, média por mês')}
+      <div class="pg-list">${groups.map(groupHTML).join('')}${sobraRow}</div>
+    </section>`;
 }
 
 // ---------- metas e investimentos ----------
-function reserveCardHTML(st, cm) {
+/** Uma linha de progresso: reserva, metas e investimentos usam o mesmo formato. */
+function progressRow({ act, id = '', emoji, name, pct = null, line }) {
+  return `<li><button class="goal" data-act="${act}"${id ? ` data-id="${id}"` : ''}>
+    <span class="emo">${emoji}</span>
+    <span class="g-main">
+      <span class="g-top"><b>${name}</b>${pct != null ? `<span class="g-pct">${pct}%</span>` : ''}</span>
+      ${pct != null ? `<span class="meter inv" role="img" aria-label="${pct}%"><i style="width:${pct}%"></i></span>` : ''}
+      <small>${line}</small>
+    </span>
+  </button></li>`;
+}
+
+function reserveRow(st, cm) {
   const cv = M.custoDeVida(st, cm);
   const res = M.reserveBalance(st);
   const goal = st.core.settings.reserveGoalMonths || 6;
   const months = cv ? res / cv : 0;
-  const resPct = cv ? Math.min(100, Math.max(0, (months / goal) * 100)) : 0;
-  const marks = [1, 3, 6, 12].filter((m) => m < goal);
-  return `<section class="card ${reveal()}">
-      <div class="card-head"><h2>🛟 Reserva de emergência</h2><button class="link" data-act="reserve-edit">Atualizar</button></div>
-      ${
-        cv
-          ? `<p class="res-value"><b>${m0(res)}</b> de ${m0(cv * goal)}</p>
-        <div class="res-meter" role="img" aria-label="${months.toFixed(1)} de ${goal} meses"><i style="width:${resPct.toFixed(1)}%"></i>${marks.map((m) => `<em style="left:${((m / goal) * 100).toFixed(1)}%"><span>${m}m</span></em>`).join('')}</div>
-        <p class="card-sub">Cobre <b>${months.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${months < 2 ? 'mês' : 'meses'}</b> do seu custo de vida (${m0(cv)}/mês). Meta: ${goal} meses. É a primeira meta do método: Cerbasi recomenda no mínimo 3 meses e mirar em 6.</p>`
-          : `<p class="card-sub"><b>${m0(res)}</b> guardados. Monte o plano (ou lance alguns gastos) para o app calcular seu custo de vida e a meta da reserva.</p>`
-      }
-    </section>`;
+  return progressRow({
+    act: 'reserve-edit',
+    emoji: '🛟',
+    name: 'Reserva de emergência',
+    pct: cv ? Math.round(Math.min(1, Math.max(0, months / goal)) * 100) : null,
+    line: cv ? `${m0(res)} de ${m0(cv * goal)} · ${months.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} de ${goal} meses` : `${m0(res)} guardados`,
+  });
 }
 
-function goalRowHTML(g, i) {
-  let pace;
-  if (i.reached) pace = `<small class="g-pace ok">🎉 Alcançada! Quando usar o dinheiro, toque para concluir.</small>`;
-  else if (i.overdue) pace = `<small class="g-pace late"><span class="flag-ic crit">!</span>O prazo passou. Toque para ajustar.</small>`;
-  else if (!i.line) pace = `<small class="g-pace">Sem valor por mês no plano${i.need ? `: guarde ${m0(i.need)}/mês para chegar no prazo` : ''}. Toque para definir.</small>`;
-  else if (i.late) pace = `<small class="g-pace late"><span class="flag-ic crit">!</span>Para chegar no prazo, guarde ${m0(i.need)}/mês (no plano: ${m0(i.planned)}).</small>`;
-  else pace = `<small class="g-pace ok"><span class="ok-ic">${IC.check}</span>No ritmo: ${m0(i.planned)} por mês${i.eta ? ` · chega em ${U.monthShortYear(i.eta)}` : ''}.</small>`;
-  return `<li><button class="goal" data-act="goal-open" data-id="${g.id}">
-    <span class="emo">${esc(g.emoji || '🎯')}</span>
-    <span class="g-main">
-      <span class="g-top"><b>${esc(g.name)}</b><span class="g-pct">${Math.round(i.pct * 100)}%</span></span>
-      <span class="meter inv" role="img" aria-label="${Math.round(i.pct * 100)}% da meta"><i style="width:${(i.pct * 100).toFixed(1)}%"></i></span>
-      <small>${m0(i.saved)} de ${m0(i.target)}${g.due ? ` · até ${U.monthShortYear(g.due)}` : ''}</small>
-      ${pace}
-    </span>
-  </button></li>`;
+function goalRow(g, i) {
+  const status = i.reached
+    ? ' · 🎉 alcançada'
+    : i.overdue || i.late
+      ? ' · <span class="late"><span class="flag-ic crit">!</span> atrasada</span>'
+      : '';
+  return progressRow({
+    act: 'goal-open',
+    id: g.id,
+    emoji: esc(g.emoji || '🎯'),
+    name: esc(g.name),
+    pct: Math.round(i.pct * 100),
+    line: `${m0(i.saved)} de ${m0(i.target)}${i.planned ? ` · ${m0(i.planned)}/mês` : ''}${g.due ? ` · até ${U.monthShortYear(g.due)}` : ''}${status}`,
+  });
 }
 
 export function goalsHTML() {
@@ -519,57 +400,29 @@ export function goalsHTML() {
     .map((g) => ({ g, i: M.goalInfo(st, g, cm, by) }))
     .sort((a, b) => (a.g.due || '9999').localeCompare(b.g.due || '9999'));
   const done = (st.core.goals || []).filter((g) => g.done);
-  const parts = [
-    { cls: 'p-res', name: 'Reserva de emergência', v: Math.max(0, sv.reserve) },
-    { cls: 'p-metas', name: 'Metas', v: Math.max(0, sv.metas) },
-    { cls: 'p-outros', name: 'Outros investimentos', v: Math.max(0, sv.other), act: 'invest-edit' },
-  ];
-  const lv = G.levelOf(st.core.game.xp);
-  const earned = G.BADGES.filter((b) => st.core.game.badges[b.id]).length;
-  const month = sv.plannedNow
-    ? sv.realNow >= sv.plannedNow
-      ? `<span class="ok-ic">${IC.check}</span><span>Este mês você já guardou ${m0(sv.realNow)}. Pague-se primeiro: feito!</span>`
-      : `<span>Este mês: guardou <b>${m0(Math.max(0, sv.realNow))}</b> de ${m0(sv.plannedNow)} previstos.</span>`
-    : '<span>Guardar todo mês, antes de gastar, é o “pague-se primeiro” do Cerbasi.</span>';
+  const doneList = ctx.ui.showDoneGoals
+    ? `<ul class="goals done">${done
+        .map((g) => {
+          const i = M.goalInfo(st, g, cm, by);
+          return progressRow({ act: 'goal-open', id: g.id, emoji: esc(g.emoji || '🎯'), name: esc(g.name), line: `Concluída · juntou ${m0(i.saved)}` });
+        })
+        .join('')}</ul>`
+    : '';
 
-  return `<section class="page-head ${reveal()}"><p class="eyebrow">Pague-se primeiro</p><h1>Metas e investimentos</h1></section>
-    <section class="card ${reveal()}">
+  return `<section class="card ${reveal()}">
       <p class="hero-label">Guardado até agora</p>
       <p class="hero">${heroMoney(sv.total)}</p>
-      <p class="hero-sub">${month}</p>
-      ${splitBarHTML(parts, 'Dinheiro guardado')}
-      <ul class="split-list">${parts
-        .map((p) => `<li><i class="sw ${p.cls}"></i><span>${p.name}${p.act ? ` <button class="link small" data-act="${p.act}">Atualizar</button>` : ''}</span><b>${m0(p.v)}</b></li>`)
-        .join('')}</ul>
-      <div class="sv-future"><span>Em 12 meses, seguindo o plano</span><b>${m0(sv.in12)}</b></div>
+      <p class="hero-sub">Em 12 meses, no ritmo do plano: <b>${m0(sv.in12)}</b></p>
     </section>
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Minhas metas</h2><button class="btn small lime" data-act="goal-new">${IC.plus}Nova meta</button></div>
-      ${
-        active.length
-          ? `<ul class="goals">${active.map(({ g, i }) => goalRowHTML(g, i)).join('')}</ul>`
-          : `<p class="card-sub">Viagem, carro, casa… Diga quanto custa e para quando: o app calcula quanto guardar por mês e põe no plano, para você marcar “Guardei” todo mês.</p>
-        <div class="cat-chips">${M.GOAL_IDEAS.map((x, k) => `<button type="button" class="cchip sm" data-act="goal-new" data-idea="${k}"><span>${x.emoji}</span>${esc(x.name)}</button>`).join('')}</div>`
-      }
-      ${
-        done.length
-          ? `<button class="link more" data-act="goals-done">${ctx.ui.showDoneGoals ? 'Esconder concluídas' : `Ver concluídas (${done.length})`}</button>
-        ${
-          ctx.ui.showDoneGoals
-            ? `<ul class="goals done">${done
-                .map((g) => {
-                  const i = M.goalInfo(st, g, cm, by);
-                  return `<li><button class="goal" data-act="goal-open" data-id="${g.id}"><span class="emo">${esc(g.emoji || '🎯')}</span><span class="g-main"><span class="g-top"><b>${esc(g.name)}</b></span><small>Concluída em ${U.dayLabel(g.done).toLowerCase()} · juntou ${m0(i.saved)}</small></span></button></li>`;
-                })
-                .join('')}</ul>`
-            : ''
-        }`
-          : ''
-      }
-    </section>
-    ${reserveCardHTML(st, cm)}
-    <section class="card ${reveal()}">
-      <button class="pl-item link-row" data-act="tab" data-tab="conquistas"><span class="emo">🏆</span><span class="pl-txt"><b>Suas conquistas</b><small>Nível ${lv.level} · ${esc(lv.name)} · ${U.plural(earned, 'medalha', 'medalhas')}</small></span><span class="go">${IC.right}</span></button>
+      <ul class="goals">
+        ${reserveRow(st, cm)}
+        ${active.map(({ g, i }) => goalRow(g, i)).join('')}
+        ${progressRow({ act: 'invest-edit', emoji: '💼', name: 'Outros investimentos', line: sv.other ? m0(sv.other) : 'Toque para informar' })}
+      </ul>
+      ${active.length ? '' : `<div class="cat-chips goal-ideas">${M.GOAL_IDEAS.map((x, k) => `<button type="button" class="cchip sm" data-act="goal-new" data-idea="${k}"><span>${x.emoji}</span>${esc(x.name)}</button>`).join('')}</div>`}
+      ${done.length ? `<button class="link more" data-act="goals-done">${ctx.ui.showDoneGoals ? 'Esconder concluídas' : `Ver concluídas (${done.length})`}</button>${doneList}` : ''}
     </section>`;
 }
 
@@ -581,17 +434,7 @@ export function gameHTML() {
   const lv = G.levelOf(g.xp);
   const sk = G.streakOf(st.core, today());
   const earned = G.BADGES.filter((b) => g.badges[b.id]).length;
-  const blue = Object.values(g.monthsClosed || {}).filter((v) => v === 'azul').length;
-  const steps = [
-    { t: 'Diagnóstico', d: 'Use o app por 4 semanas para conhecer seu padrão de gastos.', done: sk.totalWeeks >= 4, prog: `${Math.min(4, sk.totalWeeks)}/4 semanas` },
-    { t: 'Plano de 12 meses', d: 'Projete tudo o que entra e sai, inclusive os gastos anuais.', done: !!g.badges.plano },
-    { t: 'Pague-se primeiro', d: 'Guarde no começo do mês, antes de gastar.', done: !!g.badges.pague },
-    { t: 'Reserva mínima', d: '3 meses de custo de vida guardados.', done: !!g.badges.reserva3 },
-    { t: 'Reserva completa', d: '6 meses: tranquilidade para imprevistos.', done: !!g.badges.reserva6 },
-    { t: 'Três meses no azul', d: 'Receber mais do que gastar, três vezes.', done: blue >= 3, prog: `${Math.min(3, blue)}/3` },
-  ];
-
-  return `<button class="link back-link ${reveal()}" data-act="tab" data-tab="metas">${IC.left}Metas</button><section class="page-head ${reveal()}"><p class="eyebrow">Seu progresso</p><h1>Conquistas</h1></section>
+  return `<section class="page-head ${reveal()}"><h1>Conquistas</h1></section>
     <section class="card level-card ${reveal()}">
       <div class="lv-badge"><span>${lv.level}</span></div>
       <div class="lv-txt"><p class="eyebrow">Nível ${lv.level}</p><h2>${lv.name}</h2>
@@ -601,29 +444,10 @@ export function gameHTML() {
     <section class="card ${reveal()}">
       <div class="card-head"><h2>🔥 ${sk.current} ${sk.current === 1 ? 'semana' : 'semanas'} em dia</h2><span class="pill">recorde ${sk.best}</span></div>
       <div class="weeks" role="img" aria-label="Últimas 12 semanas">${sk.weeks.map((w) => `<span class="wk ${w.active ? 'on' : ''} ${w.checkin ? 'ck' : ''} ${w.current ? 'cur' : ''}"></span>`).join('')}</div>
-      <p class="card-sub">Uma semana conta se você lançar qualquer coisa ou fizer o check-in. Perdeu uma? Sem drama: o recorde fica guardado e voltar dá bônus.</p>
-      ${sk.checkinThisWeek ? `<p class="ok-line">${IC.check} Check-in desta semana feito.</p>` : `<button class="btn lime wide" data-act="checkin">Fazer o check-in da semana · +50 XP</button>`}
-    </section>
-    <section class="card ${reveal()}">
-      <div class="card-head"><h2>Jornada Cerbasi</h2><span class="pill">${steps.filter((s) => s.done).length}/${steps.length}</span></div>
-      <ol class="journey">${steps.map((s, i) => `<li class="${s.done ? 'done' : ''}"><span class="j-dot">${s.done ? IC.check : i + 1}</span><div><b>${s.t}</b><small>${s.d}${!s.done && s.prog ? ` · ${s.prog}` : ''}</small></div></li>`).join('')}</ol>
     </section>
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Medalhas</h2><span class="pill">${earned}/${G.BADGES.length}</span></div>
-      <div class="badges">${G.BADGES.map((b) => `<div class="badge ${g.badges[b.id] ? 'on' : ''}"><span class="b-emo">${b.emoji}</span><b>${b.name}</b><small>${b.desc}</small></div>`).join('')}</div>
-    </section>
-    <section class="card ${reveal()}">
-      <div class="card-head"><h2>Como ganhar XP</h2></div>
-      <ul class="xp-list">
-        <li><span>Lançar um gasto ou receita</span><b>+5</b></li>
-        <li><span>Marcar uma conta do plano</span><b>+5</b></li>
-        <li><span>Check-in da semana</span><b>+50</b></li>
-        <li><span>Guardar dinheiro no mês</span><b>+50</b></li>
-        <li><span>Voltar depois de uma pausa</span><b>+30</b></li>
-        <li><span>Fechar o mês no azul</span><b>+100</b></li>
-        <li><span>Cada medalha</span><b>+25</b></li>
-      </ul>
-      <p class="card-sub">Lançamentos avulsos rendem até 30 XP por dia.</p>
+      <div class="badges compact">${G.BADGES.map((b) => `<button type="button" class="badge ${g.badges[b.id] ? 'on' : ''}" data-act="badge-info" data-id="${b.id}"><span class="b-emo">${b.emoji}</span><b>${b.name}</b></button>`).join('')}</div>
     </section>`;
 }
 

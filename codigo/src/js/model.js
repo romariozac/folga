@@ -141,7 +141,6 @@ export function defaultCore() {
       reserveStart: 0, // quanto já havia na reserva antes do app
       reserveGoalMonths: 6,
       investStart: 0, // quanto já havia em outros investimentos (fora a reserva e as metas)
-      simple: true, // modo simples: menos telas (Início, Plano, Metas) e menos coisa em cada uma
       lastImport: null, // data da última importação de extrato/fatura (o hábito principal)
       createdAt: isoDate(),
       favs: [...DEFAULT_FAVS],

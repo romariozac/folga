@@ -3436,30 +3436,98 @@ details.tech code {
   font-size: 12.5px;
 }
 .pg-amt {
+  display: grid;
+  justify-items: end;
   font-weight: 650;
-  font-size: 14px;
+  font-size: 14.5px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.pg-amt small {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pg-amt.neg {
+  color: var(--crit-text);
+}
+.pg-head .sw {
+  width: 10px;
+  height: 10px;
+}
 .pg .pl-list {
   margin: -4px 0 6px;
-  padding-left: 4px;
+  padding-left: 20px;
 }
 .pg.open .pg-head {
   padding-bottom: 6px;
 }
-.table-card summary {
-  list-style: none;
-  padding: 0;
+.pg-static .pg-head {
+  cursor: default;
 }
-.table-card summary::-webkit-details-marker {
-  display: none;
+.chev-space {
+  width: 16px;
+  flex: none;
 }
-.table-card[open] summary {
-  margin-bottom: 10px;
+.pg-eyebrow {
+  margin: 10px 0 0;
 }
-.table-card[open] summary .chev .ic {
-  transform: rotate(-90deg);
+/* Início: quanto já foi gasto do previsto (o resto do mês fica na aba Mês) */
+.month-card .eyebrow + .hero-label {
+  margin-top: 8px;
+}
+.spent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.spent b {
+  color: var(--ink);
+}
+.spent + .meter {
+  margin-top: 8px;
+}
+.late {
+  color: var(--crit-text);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.late .flag-ic {
+  width: 14px;
+  height: 14px;
+  font-size: 9.5px;
+  display: inline-grid;
+  vertical-align: -2px;
+}
+.goal-ideas {
+  margin-top: 12px;
+}
+/* medalhas: só o emoji e o nome; tocar mostra a descrição */
+.badges.compact {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.badges.compact .badge {
+  justify-items: center;
+  text-align: center;
+  padding: 10px 6px;
+  font: inherit;
+  background: none;
+  cursor: pointer;
+}
+.badges.compact .badge.on {
+  background: color-mix(in oklab, var(--lime) 16%, var(--card));
+}
+.badges.compact .b-emo {
+  font-size: 26px;
+}
+.badges.compact b {
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 /* ---------- aba Metas ---------- */

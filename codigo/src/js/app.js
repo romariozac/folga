@@ -7,11 +7,12 @@ import * as SH from './sheets.js';
 import { openImport } from './importui.js';
 import * as GU from './goalsui.js';
 import * as M from './model.js';
+import * as G from './game.js';
 import { toast } from './ui.js';
 import { store } from './store.js';
 import { IC, $, $$, closeAllSheets, sheetOpen } from './ui.js';
 
-// "conquistas" não fica na barra: abre pelo nível/XP no topo e pelo atalho na aba Metas
+// "conquistas" não fica na barra: abre pelo nível/XP, no topo
 const TABS = ['inicio', 'mes', 'plano', 'metas', 'conquistas'];
 let inArtifact = false;
 
@@ -51,10 +52,9 @@ function render() {
   view.classList.toggle('animate', ctx.ui.animate);
   ctx.ui.animate = false;
   V.mountCharts(view);
-  // Conquistas não fica na barra: abre pelo nível no topo e pela aba Metas (que fica marcada)
-  const hl = t === 'conquistas' ? 'metas' : t;
+  // Conquistas não fica na barra: abre pelo nível, no topo
   $$('#tabbar [data-tab]').forEach((b) => {
-    const on = b.dataset.tab === hl;
+    const on = b.dataset.tab === t;
     b.classList.toggle('on', on);
     if (on) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
@@ -178,22 +178,15 @@ document.addEventListener('click', (e) => {
       render();
       break;
     }
-    case 'plan-more':
-      ctx.ui.planMore = !ctx.ui.planMore;
-      render();
+    case 'badge-info': {
+      const b = G.badgeById(d.id);
+      if (b) toast(`${b.emoji} <b>${U.esc(b.name)}</b>: ${U.esc(b.desc)}${ctx.S.core.game.badges[b.id] ? '' : ' <small>(ainda não conquistada)</small>'}`);
       break;
+    }
     default:
       break;
   }
 });
-// a tabela da aba Plano continua aberta (ou fechada) quando a tela é redesenhada
-document.addEventListener(
-  'toggle',
-  (e) => {
-    if (e.target.dataset && e.target.dataset.keep === 'planTable') ctx.ui.planTable = e.target.open;
-  },
-  true
-);
 
 function routeHash() {
   const h = decodeURIComponent((location.hash || '').slice(1));

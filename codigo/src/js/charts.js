@@ -117,10 +117,7 @@ export function projectionSVG(rows, width) {
     const X = px.toFixed(1), Y = py.toFixed(1);
     s += `<g class="c-accdot${accs[i] < 0 ? ' neg' : ''}" data-i="${i}"><circle class="c-sel" cx="${X}" cy="${Y}" r="10"/><circle class="c-ring" cx="${X}" cy="${Y}" r="6"/><circle class="c-dot" cx="${X}" cy="${Y}" r="4"/></g>`;
   });
-  // valor final escrito junto ao último ponto (acima dele, ou abaixo se não couber)
-  const [ex, ey] = pts[n - 1];
-  const ly = ey - 12 < padT - 6 ? ey + 20 : ey - 12;
-  s += `<text class="c-acc-label" x="${(ex + 4).toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="end">${num(accs[n - 1], { compact: true })}</text>`;
+  // (o valor final do acumulado já aparece em destaque acima do gráfico; tocar num mês mostra o de cada mês)
 
   // ---- meses, alertas e áreas de toque (a coluna inteira) ----
   const lab = H - padB;

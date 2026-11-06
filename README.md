@@ -7,30 +7,29 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 > O Folga não é um produto oficial do Gustavo Cerbasi. Ele aplica ideias públicas dele (entrevistas,
 > resumos de livros e a planilha de orçamento doméstico). As fontes estão no fim deste arquivo.
 
-## Modo simples (ligado de início)
+## Simples de propósito
 
-Para quem costuma abandonar app de finanças, o app começa no **modo simples**:
+Para quem costuma abandonar app de finanças, cada informação aparece **num lugar só**:
 
-- **Menos coisa em cada tela:** no Início, em vez do gráfico, só o aviso dos próximos meses no vermelho; no Plano,
-  o número, o gráfico e os itens (divisão da renda, dica e tabela ficam em **Ver mais**). A barra continua a mesma:
-  Início, Mês, **+**, Plano e Metas.
+- **Início:** como está o mês (a sobra prevista e quanto já gastou do previsto), um aviso por vez (voltar depois de
+  uma pausa, hora de importar ou o check-in da semana) e as contas do mês para marcar.
+- **Mês:** o previsto x realizado, os gastos por categoria e os lançamentos.
+- **Plano:** os próximos 12 meses e os itens do plano.
+- **Metas:** o dinheiro guardado e cada meta.
 - **Importar como hábito:** uma vez por semana, ou quando a fatura fechar, importe a fatura ou o extrato: o app lança
   tudo e só pergunta as dúvidas. Se passar uma semana sem importar, o Início lembra, sem bronca. O check-in semanal
   também começa por aí. Lançar à mão (botão **+**) continua a 2 toques, para quando quiser.
 - **Sem janelas de comemoração:** medalhas, nível e mês no azul aparecem numa linha do aviso, sem interromper. Só a
   meta alcançada ganha comemoração.
 
-Quer ver tudo? *Ajustes › Modo simples* (desligue): o Início volta a ter o gráfico dos próximos meses e o Plano mostra
-tudo de uma vez.
-
 ## As telas que respondem o que você pediu
 
 | Pergunta | Onde |
 |---|---|
-| Quanto estou recebendo e gastando **este mês**? | **Início**: “Entrou” e “Gastou” contra o previsto, mais a *previsão de sobra no fim do mês*. A aba **Mês** mostra previsto x realizado por categoria. |
-| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque, o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho), “Para onde vai a renda” (contas fixas, dia a dia, anuais, guardar e sobra, em % da renda), os itens do plano em grupos que abrem com um toque e a tabela mês a mês, como na planilha. |
-| Quanto já guardei e para quê? | **Metas**: o total guardado (reserva, metas e outros investimentos), quanto terá em 12 meses seguindo o plano, cada meta com barra de progresso e ritmo, e a reserva de emergência. |
-| Como me manter animado? | **Conquistas** (toque no seu nível, no topo, ou no atalho da aba Metas): níveis, XP, semanas em dia, medalhas e a “Jornada Cerbasi”. |
+| Quanto estou recebendo e gastando **este mês**? | **Início**: a *sobra prevista no fim do mês* e quanto já gastou do previsto. A aba **Mês** mostra previsto x realizado por categoria e os lançamentos. |
+| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque e o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho). Embaixo, os itens do plano em grupos (renda, contas fixas, dia a dia, anuais e parcelas, guardar), cada um com quanto pesa na renda e uma barra que mostra a divisão; tocar num grupo abre os itens. |
+| Quanto já guardei e para quê? | **Metas**: o total guardado, quanto terá em 12 meses seguindo o plano e, numa lista só, a reserva de emergência, cada meta e outros investimentos, com barra de progresso. |
+| Como me manter animado? | **Conquistas** (toque no seu nível, no topo): nível, XP, semanas em dia e medalhas (toque numa medalha para ver o que ela pede). |
 
 ## Metas: viagem, carro, casa…
 
@@ -142,7 +141,7 @@ No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito 
 | Orçamento é **projetar** o que vem pela frente, não só controlar o passado | Aba Plano: projeção de 12 meses com sobra do mês e curva do acumulado |
 | A planilha coloca **previsto x realizado**, mês a mês, por categoria (habitação, transporte, saúde, educação, despesas pessoais, lazer…) | Aba Mês e a exportação “planilha de 12 meses” (.csv para Excel/Google Planilhas) |
 | **Inverter a ordem**: definir quanto guardar para os sonhos e só depois gastar o que sobra | Aba Metas (cada sonho com valor, prazo e quanto guardar por mês, já no plano) e o item “Pague-se primeiro” (sugestão de 5 a 20% da renda) |
-| Gastos **anuais/sazonais** (IPVA, IPTU, matrícula, material escolar, presentes) | Itens “meses do ano”, alerta dos meses no vermelho e a dica de quanto separar por mês |
+| Gastos **anuais/sazonais** (IPVA, IPTU, matrícula, material escolar, presentes) | Itens “meses do ano”, alerta dos meses no vermelho e, no grupo “Anuais e parcelas”, quanto separar por mês |
 | **Reserva de emergência**: mínimo de 3 meses de custo de vida, mirando em 6 | Medidor da reserva com medalhas em 1, 3 e 6 meses |
 | **Renda variável**: planejar pelo menor ganho provável | Dica no assistente de receitas |
 | **Revisar** o plano pelo menos uma vez por mês | Check-in semanal e edição de qualquer item do plano |

@@ -826,7 +826,6 @@ export function openSettings() {
     <div class="settings form">
       <p class="sync-line">${ic}<span>${txt}</span></p>
       ${warn ? '<p class="warn-box"><span class="flag-ic crit">!</span>Este navegador não está deixando salvar dados. Faça backups ou abra o app por outro navegador.</p>' : ''}
-      <label class="tog simple-tog"><input type="checkbox" name="simple" ${s.simple !== false ? 'checked' : ''}><span><b>Modo simples</b><small>Menos coisa em cada tela: no Início, só o aviso dos meses no vermelho, sem o gráfico; no Plano, a divisão da renda e a tabela ficam em “Ver mais”. Desligue para ver tudo sempre à mostra.</small></span></label>
       <label class="field"><span>Seu nome</span><input name="name" value="${esc(s.name || '')}" maxlength="30" placeholder="Como quer ser chamado"></label>
       <label class="field"><span>Dia do check-in semanal</span><select name="checkinDay">${U.DIAS.map((d, i) => `<option value="${i}" ${i === (s.checkinDay ?? 0) ? 'selected' : ''}>${U.cap(d)}</option>`).join('')}</select></label>
       <div class="field"><span>Tema</span><div class="seg full" data-seg="theme">${[
@@ -870,11 +869,6 @@ export function openSettings() {
         el.querySelector('[name="checkinDay"]').addEventListener('change', (e) => {
           s.checkinDay = +e.target.value;
           save();
-        });
-        el.querySelector('[name="simple"]').addEventListener('change', (e) => {
-          s.simple = e.target.checked;
-          save();
-          toast(s.simple ? 'Modo simples ligado.' : 'Modo completo: todos os detalhes à mostra.');
         });
         el.querySelector('[data-s="import"]').addEventListener('change', async (e) => {
           const file = e.target.files && e.target.files[0];
@@ -943,7 +937,7 @@ export function openMethod() {
       <h3>2. Pague-se primeiro</h3>
       <p>Inverter a ordem: estimar os sonhos, definir quanto guardar por mês e descontar isso da renda antes de qualquer gasto. O que sobra define o padrão de vida. Na planilha, o investimento entra como uma “despesa” do mês. <b>No app:</b> aba Metas: cada sonho com valor e prazo vira um “guardar por mês” no plano, com botão “Guardei”; e o item “Pague-se primeiro” para a reserva.</p>
       <h3>3. Os gastos que vêm uma vez por ano</h3>
-      <p>IPVA, IPTU, matrícula, material escolar, seguro, presentes. Colocados no plano desde já, eles aparecem no mês certo e o app sugere quanto separar por mês. <b>No app:</b> itens “meses do ano” e a dica de provisão.</p>
+      <p>IPVA, IPTU, matrícula, material escolar, seguro, presentes. Colocados no plano desde já, eles aparecem no mês certo e o app sugere quanto separar por mês. <b>No app:</b> itens “meses do ano”, e no Plano o grupo “Anuais e parcelas” mostra quanto separar por mês.</p>
       <h3>4. Reserva de emergência primeiro</h3>
       <p>Mínimo de 3 meses de custo de vida, mirando em 6 (mais, se a renda for instável). <b>No app:</b> o “pague-se primeiro” vai para a reserva até a meta, com medalhas em 1, 3 e 6 meses.</p>
       <h3>5. Controle semanal, sem neura</h3>
