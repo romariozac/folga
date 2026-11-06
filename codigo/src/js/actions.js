@@ -213,6 +213,16 @@ export function deleteLine(id) {
   store.save(['core']);
 }
 
+/** Conferir o plano: “Não tenho” tira a sugestão da lista (e desfazer devolve). */
+export function skipCheck(id, on = true) {
+  const s = S().core.settings;
+  const set = new Set(s.planSkip || []);
+  if (on) set.add(id);
+  else set.delete(id);
+  s.planSkip = [...set];
+  store.save(['core']);
+}
+
 export function applyOnboarding(lines, { name, reserveStart, replace }) {
   const st = S();
   const events = [];

@@ -338,15 +338,47 @@ export function monthHTML() {
 }
 
 // ---------- plano (projeção) ----------
-function planItemHTML(l) {
+/**
+ * Item dentro de um grupo do plano: mais leve que o grupo e com o nome inteiro à esquerda. O dia do vencimento
+ * fica embaixo do valor (como o % embaixo do total do grupo); embaixo do nome, só o que o grupo ainda não diz
+ * (mês do gasto anual, em que parcela está, quando acaba).
+ */
+function planItemHTML(l, mk) {
   const cat = M.catById(S(), l.cat);
+  const meta = M.planMeta(l, mk);
+  const day = M.planDay(l, mk);
   // item de uma meta abre a meta (valor, prazo e o que já foi guardado ficam juntos lá)
   const act = l.goal && M.goalById(S(), l.goal) ? `data-act="goal-open" data-id="${l.goal}"` : `data-act="line-open" data-line="${l.id}"`;
-  return `<li><button class="pl-item" ${act}>
-    <span class="emo">${cat.emoji}</span>
-    <span class="pl-txt"><b>${esc(l.name)}</b><small>${M.recText(l)}</small></span>
-    <span class="pl-amt">${m0(l.amount)}</span>
+  return `<li${M.ended(l, mk) ? ' class="ended"' : ''}><button class="pl-item" ${act}>
+    <span class="pl-emo">${cat.emoji}</span>
+    <span class="pl-txt"><b>${esc(l.name)}</b>${meta ? `<small>${meta}</small>` : ''}</span>
+    <span class="pl-amt">${m0(l.amount)}${day ? `<small>dia ${day}</small>` : ''}</span>
   </button></li>`;
+}
+
+/** Conferir o plano: por área, o que já está no plano e o que quase toda casa tem e ainda não entrou. */
+function planCheckHTML(st, cm) {
+  const ck = M.planCheck(st, cm);
+  const done = ck.pending === 0;
+  const status = done ? `<span class="ck-done"><span class="ok-ic">${IC.check}</span>Conferido</span>` : `<span class="pill">${ck.pending} para conferir</span>`;
+  const sug = (c) => `<li class="ck-sug">
+      <button class="ck-add" data-act="check-add" data-id="${c.id}" aria-label="Pôr ${esc(c.name)} no plano">${IC.plus}<span>${esc(c.name)}${c.yearly ? ' <small>todo ano</small>' : ''}</span></button>
+      <button class="link small" data-act="check-skip" data-id="${c.id}" aria-label="Não tenho ${esc(c.name)}">Não tenho</button>
+    </li>`;
+  const area = (a) => `<li class="ck-area">
+      <div class="ck-head"><span class="ck-emo">${a.emoji}</span><b>${esc(a.name)}</b>${a.pending.length ? '' : `<span class="ok-ic" role="img" aria-label="Conferido">${IC.check}</span>`}</div>
+      ${a.items.length ? `<p class="ck-items">${a.items.map((l) => esc(l.name)).join(' · ')}</p>` : ''}
+      ${a.pending.length ? `<ul class="ck-sugs">${a.pending.map(sug).join('')}</ul>` : ''}
+    </li>`;
+  const skipped = ck.skipped.length
+    ? `<p class="ck-skipped">Você disse que não tem: ${ck.skipped.map((c) => `<button class="link small" data-act="check-undo" data-id="${c.id}" aria-label="Voltar ${esc(c.name)} para a lista">${esc(c.name)}</button>`).join(', ')}. Toque num deles para voltar à lista.</p>`
+    : '';
+  return `<details class="card table-card check-card ${reveal()}" data-keep="planCheck" ${ctx.ui.planCheck ? 'open' : ''}>
+      <summary><span class="pg-txt"><b>Conferir o plano</b><small>Por área: o que já está e o que costuma ficar de fora</small></span>${status}<span class="chev">${IC.right}</span></summary>
+      <p class="card-sub">${done ? 'Nada ficou de fora. Quando a vida mudar, confira de novo.' : 'Toque no item para pôr no plano, ou em “Não tenho” para tirar da lista.'}</p>
+      <ul class="ck-list">${ck.areas.map(area).join('')}</ul>
+      ${skipped}
+    </details>`;
 }
 
 /** Barra fina dividida em partes, sem texto: as linhas logo abaixo trazem nome e valor de cada parte. */
@@ -384,7 +416,7 @@ export function planHTML() {
         <i class="sw ${gr.cls}"></i><span class="pg-txt"><b>${gr.name}</b><small>${gr.sub || U.plural(gr.items.length, 'item', 'itens')}</small></span>
         <span class="pg-amt">${m0(gr.v)}${gr.id === 'receita' ? '' : `<small>${pct(gr.v)}</small>`}</span><span class="chev ${open ? 'up' : ''}">${IC.right}</span>
       </button>
-      ${open ? `<ul class="pl-list">${gr.items.map(planItemHTML).join('')}</ul>` : ''}
+      ${open ? `<ul class="pl-list">${M.planOrder(gr.items, cm).map((l) => planItemHTML(l, cm)).join('')}</ul>` : ''}
     </div>`;
   };
   const parts = [...groups.filter((g) => g.id !== 'receita').map((g) => ({ cls: g.cls, name: g.name, v: g.v })), { cls: 'p-sobra', name: 'Sobra livre', v: Math.max(0, s.sobra) }];
@@ -408,6 +440,7 @@ export function planHTML() {
       ${splitBarHTML(parts, 'Para onde vai a renda, média por mês')}
       <div class="pg-list">${groups.map(groupHTML).join('')}${sobraRow}</div>
     </section>
+    ${planCheckHTML(st, cm)}
     <details class="card table-card ${reveal()}" data-keep="planTable" ${ctx.ui.planTable ? 'open' : ''}>
       <summary><span class="pg-txt"><b>Tabela mês a mês</b><small>Como na planilha: entra, sai, sobra e acumulado</small></span><span class="chev">${IC.right}</span></summary>
       <table class="proj-table">

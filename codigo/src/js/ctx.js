@@ -11,6 +11,7 @@ export const ctx = {
     openCats: new Set(), // grupos abertos no detalhe da aba Mês
     txFilter: null, // aba Mês: lançamentos só de uma categoria { id, sub } (sub: só aquele item, sem o resto do grupo)
     planOpen: new Set(), // grupos abertos em "Itens do plano"
+    planCheck: false, // "Conferir o plano" aberto
     planSel: null, // mês escolhido no gráfico da aba Plano
     showDoneGoals: false,
   },

@@ -198,6 +198,32 @@ document.addEventListener('click', (e) => {
       render();
       break;
     }
+    case 'check-add': {
+      // a sugestão abre o editor já preenchido: falta só o valor
+      const ck = M.PLAN_CHECKS.find((c) => c.id === d.id);
+      if (ck) SH.openLineEditor(null, M.checkLine(ck));
+      break;
+    }
+    case 'check-skip': {
+      const ck = M.PLAN_CHECKS.find((c) => c.id === d.id);
+      if (!ck) break;
+      A.skipCheck(ck.id);
+      render();
+      toast(`“${U.esc(ck.name)}” saiu da lista.`, {
+        action: {
+          label: 'Desfazer',
+          fn: () => {
+            A.skipCheck(ck.id, false);
+            render();
+          },
+        },
+      });
+      break;
+    }
+    case 'check-undo':
+      A.skipCheck(d.id, false);
+      render();
+      break;
     case 'carry-edit':
       SH.openCarry(d.mk);
       break;
@@ -210,11 +236,12 @@ document.addEventListener('click', (e) => {
       break;
   }
 });
-// a tabela mês a mês do Plano continua aberta (ou fechada) quando a tela é redesenhada
+// a tabela mês a mês e o “Conferir o plano” continuam abertos (ou fechados) quando a tela é redesenhada
 document.addEventListener(
   'toggle',
   (e) => {
-    if (e.target.dataset && e.target.dataset.keep === 'planTable') ctx.ui.planTable = e.target.open;
+    const k = e.target.dataset && e.target.dataset.keep;
+    if (k === 'planTable' || k === 'planCheck') ctx.ui[k] = e.target.open;
   },
   true
 );

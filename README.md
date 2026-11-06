@@ -17,7 +17,7 @@ Para quem costuma abandonar app de finanças, cada informação aparece **num lu
 - **Mês:** o previsto x realizado, os gastos por categoria e os lançamentos, separados em entradas, despesas e
   investimento (cada parte com o total). Toque no ícone de uma categoria, ou num item dela, para ver só os lançamentos
   dela; **Ver todos** volta ao normal.
-- **Plano:** os próximos 12 meses e os itens do plano.
+- **Plano:** os próximos 12 meses, os itens do plano e o **Conferir o plano**, para saber se ficou algo de fora.
 - **Metas:** o dinheiro guardado e cada meta.
 - **Importar como hábito:** uma vez por semana, ou quando a fatura fechar, importe a fatura ou o extrato: o app lança
   tudo e só pergunta as dúvidas. Se passar uma semana sem importar, o Início lembra, sem bronca. O check-in semanal
@@ -30,7 +30,7 @@ Para quem costuma abandonar app de finanças, cada informação aparece **num lu
 | Pergunta | Onde |
 |---|---|
 | Quanto estou recebendo e gastando **este mês**? | **Início**: a *sobra prevista no fim do mês* e quanto já gastou do previsto. A aba **Mês** funciona como um extrato: o saldo anterior (o que sobrou do mês passado), as entradas e saídas, o saldo do mês e o saldo final, que passa para o mês seguinte (em “ajustar” dá para acertar com o saldo do banco); depois, previsto x realizado por categoria e os lançamentos. |
-| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque e o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho). Embaixo, os itens do plano em grupos (renda, contas fixas, dia a dia, anuais e parcelas, guardar), cada um com quanto pesa na renda e uma barra que mostra a divisão; tocar num grupo abre os itens. No fim, a **tabela mês a mês** (entra, sai, sobra e acumulado), como na planilha: toque para abrir. |
+| Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque e o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho). Embaixo, os itens do plano em grupos (renda, contas fixas, dia a dia, anuais e parcelas, guardar), cada um com quanto pesa na renda e uma barra que mostra a divisão; tocar num grupo abre os itens, numa linha cada: primeiro o que vale todo mês (o maior primeiro), depois o que vem pela frente e, no fim e apagado, o que já passou. O dia do vencimento fica embaixo do valor e, embaixo do nome, só o que o grupo não diz (o mês do gasto anual, em que parcela está, quando acaba). Depois, o **Conferir o plano**: por área (moradia, transporte, saúde…), o que já está no plano e, tracejado, o que quase toda casa tem e ainda não entrou (condomínio, gás, IPTU, seguro do carro, presentes de fim de ano…). Toque para pôr no plano (o item já vem preenchido, falta só o valor) ou em “Não tenho”; quando não faltar nada, ele mostra “Conferido”. No fim, a **tabela mês a mês** (entra, sai, sobra e acumulado), como na planilha: toque para abrir. |
 | Quanto já guardei e para quê? | **Metas**: o total guardado, quanto terá em 12 meses seguindo o plano e, numa lista só, a reserva de emergência, cada meta e outros investimentos, com barra de progresso. |
 | Como me manter animado? | **Conquistas** (toque no seu nível, no topo): nível, XP, semanas em dia e medalhas (toque numa medalha para ver o que ela pede). |
 
@@ -148,7 +148,7 @@ No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito 
 | Gastos **anuais/sazonais** (IPVA, IPTU, matrícula, material escolar, presentes) | Itens “meses do ano”, alerta dos meses no vermelho e, no grupo “Anuais e parcelas”, quanto separar por mês |
 | **Reserva de emergência**: mínimo de 3 meses de custo de vida, mirando em 6 | Medidor da reserva com medalhas em 1, 3 e 6 meses |
 | **Renda variável**: planejar pelo menor ganho provável | Dica no assistente de receitas |
-| **Revisar** o plano pelo menos uma vez por mês | Check-in semanal e edição de qualquer item do plano |
+| **Revisar** o plano pelo menos uma vez por mês | Check-in semanal, edição de qualquer item do plano e o **Conferir o plano** (por área, o que já está e o que costuma ficar de fora) |
 
 ## Como usar no dia a dia
 

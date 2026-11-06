@@ -3627,15 +3627,181 @@ details.tech code {
   width: 10px;
   height: 10px;
 }
+/* itens de um grupo: mais leves que o grupo (emoji sem caixa) e com o valor alinhado ao valor do grupo
+   (a seta do grupo ocupa 26px à direita) */
 .pg .pl-list {
-  margin: -4px 0 6px;
-  padding-left: 20px;
+  margin: -4px 0 8px;
+  padding: 0 26px 0 20px;
+}
+.pg .pl-item {
+  gap: 10px;
+  padding: 9px 0;
+}
+.pl-emo {
+  width: 22px;
+  flex: none;
+  font-size: 17px;
+  line-height: 1;
+  text-align: center;
+}
+.pg .pl-txt b {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.pg .pl-txt small {
+  font-size: 12px;
+}
+/* o dia do vencimento vai embaixo do valor, como o % embaixo do total do grupo */
+.pg .pl-amt {
+  display: grid;
+  justify-items: end;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.pl-amt small {
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--muted);
+}
+/* o que já passou (parcelas pagas, “só em” de um mês que passou) fica no fim, apagado */
+.pl-list .ended .pl-txt b,
+.pl-list .ended .pl-amt {
+  color: var(--muted);
+  font-weight: 500;
+}
+.pl-list .ended .pl-emo {
+  opacity: 0.5;
+  filter: grayscale(1);
 }
 .pg.open .pg-head {
   padding-bottom: 6px;
 }
 .pg-static .pg-head {
   cursor: default;
+}
+/* conferir o plano: cada área com o que já está nela e as sugestões tracejadas (como o “+ Nova”) */
+.check-card .pill {
+  flex: none;
+}
+.ck-done {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--good-text);
+  white-space: nowrap;
+}
+.ck-done .ic {
+  width: 15px;
+  height: 15px;
+}
+.check-card .card-sub {
+  margin-top: 0;
+}
+.ck-list,
+.ck-sugs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ck-area {
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.ck-area:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.ck-area:last-child {
+  padding-bottom: 0;
+}
+.ck-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ck-head b {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.ck-emo {
+  width: 22px;
+  flex: none;
+  font-size: 17px;
+  line-height: 1;
+  text-align: center;
+}
+.ck-items {
+  margin: 3px 0 0 30px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.ck-sugs {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0 30px;
+}
+.ck-sug {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ck-add {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 12px 6px 10px;
+  border: 1.5px dashed var(--line-2);
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 620;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.ck-add:active {
+  background: var(--fill);
+}
+.ck-add .ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke-width: 2.4;
+  color: var(--ink-2);
+}
+.ck-add small {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ck-sug .link.small {
+  flex: none;
+  min-height: 40px;
+  padding: 0 4px 0 8px;
+}
+.ck-skipped {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.ck-skipped .link.small {
+  padding: 0;
+  color: var(--ink-2);
 }
 /* tabela mês a mês (abre e fecha) */
 .table-card summary {
