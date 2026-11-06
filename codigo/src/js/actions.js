@@ -243,6 +243,13 @@ export function setReserve(balance, goalMonths) {
   return events;
 }
 
+/** “Saldo anterior” do mês mk informado (o que havia na conta no fim do mês anterior): os outros meses se ajustam juntos. */
+export function setCarry(mk, value) {
+  const st = S();
+  st.core.settings.balanceStart = (st.core.settings.balanceStart || 0) + value - M.carryIn(st, mk);
+  store.save(['core']);
+}
+
 /** Outros investimentos (fora reserva e metas): ajusta o saldo inicial para bater com o valor informado. */
 export function setInvestStart(balance) {
   const st = S();

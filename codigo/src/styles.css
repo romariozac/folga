@@ -1073,6 +1073,28 @@ h3 {
   padding-top: 12px;
   font-weight: 650;
 }
+/* extrato: saldo anterior (vem do mês passado), saldo do mês e saldo final */
+.pr-table tr.carry th,
+.pr-table tr.carry td,
+.pr-table tr.month-res th,
+.pr-table tr.month-res td {
+  color: var(--ink-2);
+}
+.pr-table tr.carry th {
+  font-weight: 500;
+}
+.pr-table tr.carry .link {
+  font-size: 12px;
+  padding-left: 6px;
+}
+.pr-table tr.month-res th,
+.pr-table tr.month-res td {
+  border-bottom-color: var(--line-2);
+}
+.pr-table td.neg,
+.pr-table td.neg b {
+  color: var(--crit-text);
+}
 .bullets {
   display: grid;
   gap: 2px;

@@ -142,6 +142,7 @@ export function defaultCore() {
       reserveGoalMonths: 6,
       investStart: 0, // quanto já havia em outros investimentos (fora a reserva e as metas)
       lastImport: null, // data da última importação de extrato/fatura (o hábito principal)
+      balanceStart: 0, // saldo de antes do primeiro mês (ajustável para bater com o banco)
       createdAt: isoDate(),
       favs: [...DEFAULT_FAVS],
     },
@@ -447,6 +448,28 @@ export function monthCalc(S, mk) {
     saldoReal: real.receita - real.despesa - real.invest,
     saldoExp: exp.receita - exp.despesa - exp.invest,
   };
+}
+
+/** Resultado realizado de um mês: entradas − despesas − o que foi guardado. */
+function realOf(S, mk) {
+  let s = 0;
+  for (const t of txOf(S, mk)) s += t.k === 'receita' ? t.v : -t.v;
+  return s;
+}
+
+/**
+ * Saldo que vem do mês anterior, como no extrato do banco: o saldo inicial (ajustável) mais o resultado de
+ * todos os meses antes de mk. Para um mês futuro, o mês atual entra pelo esperado e os seguintes pelo previsto.
+ */
+export function carryIn(S, mk) {
+  const cm = isoDate().slice(0, 7);
+  let bal = S.core.settings.balanceStart || 0;
+  for (const m of Object.keys(S.months)) if (m < mk && m <= cm) bal += realOf(S, m);
+  if (mk > cm) {
+    bal += monthCalc(S, cm).saldoExp - realOf(S, cm);
+    for (let m = addMonths(cm, 1); m < mk; m = addMonths(m, 1)) bal += monthCalc(S, m).saldoPrev;
+  }
+  return bal;
 }
 
 /** Projeção mês a mês (o coração da planilha do Cerbasi: tudo que vai entrar e sair). */

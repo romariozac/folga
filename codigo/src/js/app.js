@@ -178,6 +178,9 @@ document.addEventListener('click', (e) => {
       render();
       break;
     }
+    case 'carry-edit':
+      SH.openCarry(d.mk);
+      break;
     case 'badge-info': {
       const b = G.badgeById(d.id);
       if (b) toast(`${b.emoji} <b>${U.esc(b.name)}</b>: ${U.esc(b.desc)}${ctx.S.core.game.badges[b.id] ? '' : ' <small>(ainda não conquistada)</small>'}`);

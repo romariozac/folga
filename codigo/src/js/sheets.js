@@ -738,6 +738,36 @@ export function openLineEditor(line = null, defaults = {}) {
   );
 }
 
+// =============== SALDO QUE PASSA DE UM MÊS PARA O OUTRO ===============
+/** Ajustar o “saldo anterior” do mês para bater com o banco; os outros meses acompanham. */
+export function openCarry(mk) {
+  const prev = U.addMonths(mk, -1);
+  openSheet(
+    `${sheetHead(`Saldo no fim de ${U.monthName(prev)}`, 'Quanto você tinha na conta? Os meses seguintes partem desse valor, como no extrato do banco.')}
+    <form class="form">
+      <label class="field"><span>Saldo</span><div class="money-in"><span>R$</span><input name="v" inputmode="decimal" value="${U.moneyInput(M.carryIn(S(), mk))}" placeholder="0,00"></div>
+      <small class="help">Para saldo negativo, comece com o sinal de menos (ex.: -150,00).</small></label>
+      <button class="btn primary wide" type="submit">Salvar</button>
+    </form>`,
+    {
+      onMount: (el, close) => {
+        const form = $('form', el);
+        const input = form.elements.v;
+        // moneyInput não mostra o sinal: o campo começa com o valor e o sinal de menos, se houver
+        const cur = M.carryIn(S(), mk);
+        if (cur < 0) input.value = '-' + U.moneyInput(cur);
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          A.setCarry(mk, U.parseMoney(input.value));
+          close();
+          rerender();
+          toast('Saldo ajustado.');
+        });
+      },
+    }
+  );
+}
+
 // =============== RESERVA ===============
 export function openReserve() {
   const st = S();

@@ -204,7 +204,11 @@ export function monthHTML() {
   const c = M.monthCalc(st, mk);
   const cm = curMk();
   const isCur = mk === cm;
+  const future = mk > cm;
   const tr = (cls, label, p, r) => `<tr><th><i class="sw ${cls}"></i>${label}</th><td>${m0(p)}</td><td><b>${m0(r)}</b></td></tr>`;
+  // como no extrato do banco: o saldo do fim do mês anterior entra no começo deste
+  const carry = M.carryIn(st, mk);
+  const neg = (v) => (v < 0 ? 'neg' : '');
 
   const cats = Object.values(c.byCat)
     .filter((b) => b.kind === 'despesa' && (b.prev || b.real))
@@ -259,8 +263,12 @@ export function monthHTML() {
     <section class="card ${reveal()}">
       <table class="pr-table">
         <thead><tr><th></th><th>Previsto</th><th>Realizado</th></tr></thead>
-        <tbody>${tr('in', 'Entradas', c.prev.receita, c.real.receita)}${tr('out', 'Despesas', c.prev.despesa, c.real.despesa)}${tr('inv', 'Investimento', c.prev.invest, c.real.invest)}</tbody>
-        <tfoot><tr><th>Saldo</th><td class="${c.saldoPrev < 0 ? 'neg' : ''}">${m0(c.saldoPrev)}</td><td class="${c.saldoReal < 0 ? 'neg' : ''}"><b>${m0(c.saldoReal)}</b></td></tr></tfoot>
+        <tbody>
+          <tr class="carry"><th>Saldo anterior${future ? '' : ` <button class="link small" data-act="carry-edit" data-mk="${mk}">ajustar</button>`}</th><td class="${neg(carry)}">${m0(carry)}</td><td class="${future ? '' : neg(carry)}">${future ? '—' : m0(carry)}</td></tr>
+          ${tr('in', 'Entradas', c.prev.receita, c.real.receita)}${tr('out', 'Despesas', c.prev.despesa, c.real.despesa)}${tr('inv', 'Investimento', c.prev.invest, c.real.invest)}
+          <tr class="month-res"><th>Saldo do mês</th><td class="${neg(c.saldoPrev)}">${m0(c.saldoPrev)}</td><td class="${future ? '' : neg(c.saldoReal)}">${future ? '—' : m0(c.saldoReal)}</td></tr>
+        </tbody>
+        <tfoot><tr><th>Saldo final</th><td class="${neg(carry + c.saldoPrev)}">${m0(carry + c.saldoPrev)}</td><td class="${future ? '' : neg(carry + c.saldoReal)}"><b>${future ? '—' : m0(carry + c.saldoReal)}</b></td></tr></tfoot>
       </table>
     </section>
     <section class="card ${reveal()}">

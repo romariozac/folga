@@ -26,7 +26,7 @@ Para quem costuma abandonar app de finanças, cada informação aparece **num lu
 
 | Pergunta | Onde |
 |---|---|
-| Quanto estou recebendo e gastando **este mês**? | **Início**: a *sobra prevista no fim do mês* e quanto já gastou do previsto. A aba **Mês** mostra previsto x realizado por categoria e os lançamentos. |
+| Quanto estou recebendo e gastando **este mês**? | **Início**: a *sobra prevista no fim do mês* e quanto já gastou do previsto. A aba **Mês** funciona como um extrato: o saldo anterior (o que sobrou do mês passado), as entradas e saídas, o saldo do mês e o saldo final, que passa para o mês seguinte (em “ajustar” dá para acertar com o saldo do banco); depois, previsto x realizado por categoria e os lançamentos. |
 | Quanto vou receber e gastar **nos próximos meses**? | **Plano**: a sobra acumulada em 12 meses em destaque e o gráfico mês a mês com a **curva do acumulado** junto com as barras (toque num mês e os valores aparecem logo abaixo, com o motivo dos meses no vermelho). Embaixo, os itens do plano em grupos (renda, contas fixas, dia a dia, anuais e parcelas, guardar), cada um com quanto pesa na renda e uma barra que mostra a divisão; tocar num grupo abre os itens. No fim, a **tabela mês a mês** (entra, sai, sobra e acumulado), como na planilha: toque para abrir. |
 | Quanto já guardei e para quê? | **Metas**: o total guardado, quanto terá em 12 meses seguindo o plano e, numa lista só, a reserva de emergência, cada meta e outros investimentos, com barra de progresso. |
 | Como me manter animado? | **Conquistas** (toque no seu nível, no topo): nível, XP, semanas em dia e medalhas (toque numa medalha para ver o que ela pede). |
