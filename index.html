@@ -858,30 +858,47 @@ h3 {
   font-weight: 650;
 }
 /* entradas, despesas e investimento em partes separadas, cada uma com a cor da legenda */
+/* a parte inteira (faixa e itens) leva a cor; a faixa do topo, a mesma cor duas vezes, fica mais forte */
 .flow {
-  margin-top: 12px;
+  --flow-bg: var(--fill);
+  margin: 12px -10px 0;
+  padding: 0 10px 2px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--flow-bg);
 }
 .flow + .flow {
-  margin-top: 22px;
+  margin-top: 14px;
+}
+.f-in {
+  --flow-bg: var(--t-in);
+}
+.f-out {
+  --flow-bg: var(--t-out);
+}
+.f-inv {
+  --flow-bg: var(--t-inv);
 }
 .flow-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 2px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: var(--fill);
+  margin: 0 -10px;
+  padding: 10px 12px;
+  background: var(--flow-bg);
   font-size: 15px;
 }
-.f-in .flow-head {
-  background: var(--t-in);
+/* sobre a cor: ícones e botões em branco, linhas finas da cor da tinta */
+.flow .emo {
+  background: var(--card);
 }
-.f-out .flow-head {
-  background: var(--t-out);
+.flow .tick:not(.on) {
+  background: var(--card);
 }
-.f-inv .flow-head {
-  background: var(--t-inv);
+.flow .bill,
+.flow .tx {
+  border-top-color: var(--line);
+  border-top-color: color-mix(in oklab, var(--ink) 9%, transparent);
 }
 .flow-head b {
   font-weight: 700;
@@ -902,6 +919,7 @@ h3 {
 }
 .flow .day {
   margin-top: 12px;
+  color: var(--ink-2);
 }
 .flow-head + .bills {
   margin-top: 2px;
