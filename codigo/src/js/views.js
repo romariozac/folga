@@ -344,7 +344,20 @@ export function planHTML() {
       <p class="eyebrow pg-eyebrow">Média por mês</p>
       ${splitBarHTML(parts, 'Para onde vai a renda, média por mês')}
       <div class="pg-list">${groups.map(groupHTML).join('')}${sobraRow}</div>
-    </section>`;
+    </section>
+    <details class="card table-card ${reveal()}" data-keep="planTable" ${ctx.ui.planTable ? 'open' : ''}>
+      <summary><span class="pg-txt"><b>Tabela mês a mês</b><small>Como na planilha: entra, sai, sobra e acumulado</small></span><span class="chev">${IC.right}</span></summary>
+      <table class="proj-table">
+        <thead><tr><th>Mês</th><th>Entra</th><th>Sai</th><th>Sobra</th><th>Acumulado</th></tr></thead>
+        <tbody>${rows
+          .map(
+            (r) =>
+              `<tr class="${r.saldo < 0 ? 'row-neg' : ''}"><th>${U.monthShortYear(r.mk)}</th><td>${U.num(r.receita)}</td><td>${U.num(r.despesa + r.invest)}</td><td>${r.saldo < 0 ? '<span class="flag-ic crit">!</span>' : ''}${U.num(r.saldo)}</td><td class="${r.acc < 0 ? 'neg' : 'muted'}">${U.num(r.acc)}</td></tr>${r.extras.length ? `<tr class="extras"><td colspan="5">${esc(r.extras.map((l) => l.name).join(' · '))}</td></tr>` : ''}`
+          )
+          .join('')}</tbody>
+      </table>
+      <p class="card-sub">“Sai” inclui o que você guarda. “Acumulado” é a sobra somada mês a mês, se tudo sair como planejado.</p>
+    </details>`;
 }
 
 // ---------- metas e investimentos ----------

@@ -187,6 +187,14 @@ document.addEventListener('click', (e) => {
       break;
   }
 });
+// a tabela mês a mês do Plano continua aberta (ou fechada) quando a tela é redesenhada
+document.addEventListener(
+  'toggle',
+  (e) => {
+    if (e.target.dataset && e.target.dataset.keep === 'planTable') ctx.ui.planTable = e.target.open;
+  },
+  true
+);
 
 function routeHash() {
   const h = decodeURIComponent((location.hash || '').slice(1));

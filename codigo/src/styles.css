@@ -3465,6 +3465,20 @@ details.tech code {
 .pg-static .pg-head {
   cursor: default;
 }
+/* tabela mês a mês (abre e fecha) */
+.table-card summary {
+  list-style: none;
+  padding: 0;
+}
+.table-card summary::-webkit-details-marker {
+  display: none;
+}
+.table-card[open] summary {
+  margin-bottom: 10px;
+}
+.table-card[open] summary .chev .ic {
+  transform: rotate(-90deg);
+}
 .chev-space {
   width: 16px;
   flex: none;
