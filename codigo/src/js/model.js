@@ -1,5 +1,5 @@
 // Modelo de dados e cálculos do plano (projeção) e do mês (previsto x realizado).
-import { addMonths, monthDiff, isoDate, sum } from './util.js';
+import { addMonths, monthDiff, isoDate, sum, monthShortYear, listPT, MES_CURTO } from './util.js';
 import { MERCHANTS } from './merchants.js';
 
 export const KIND_LABEL = { despesa: 'Gasto', receita: 'Receita', invest: 'Investimento' };
@@ -145,6 +145,7 @@ export function defaultCore() {
       balanceStart: 0, // saldo de antes do primeiro mês (ajustável para bater com o banco)
       createdAt: isoDate(),
       favs: [...DEFAULT_FAVS],
+      planSkip: [], // “Conferir o plano”: sugestões que a pessoa disse que não tem (ids de PLAN_CHECKS)
     },
     cats: DEFAULT_CATS.map((c) => ({ ...c })),
     plan: [],
@@ -625,6 +626,159 @@ export function recText(l) {
     default:
       return '';
   }
+}
+
+// ---------- itens do plano: ordem e texto curto ----------
+/** Último mês em que o item acontece (null = não tem fim). */
+export function lastMk(l) {
+  if (l.rec === 'mensal') return l.end || null;
+  if (l.rec === 'unico') return l.start;
+  if (l.rec === 'parcelas') return addMonths(l.start, (l.count || 1) - 1);
+  return null;
+}
+
+/** O item já passou: não acontece mais de mk em diante (parcelas pagas, “só em” de um mês que passou). */
+export function ended(l, mk) {
+  const last = lastMk(l);
+  return !!last && last < mk;
+}
+
+/** Próximo mês (de mk em diante) em que o item acontece. */
+export function nextMk(l, mk) {
+  for (let i = 0; i < 24; i++) {
+    const m = addMonths(mk, i);
+    if (occurs(l, m)) return m;
+  }
+  return null;
+}
+
+/** Dia do vencimento de uma conta de todo mês (na lista do plano ele fica embaixo do valor). */
+export const planDay = (l, mk) => (l.rec === 'mensal' && l.type !== 'verba' && l.day && !ended(l, mk) ? l.day : null);
+
+/**
+ * Texto curto do item na lista do plano: só o que o grupo ainda não diz. “Contas fixas” já diz que é todo
+ * mês e “Dia a dia” que vai aos poucos; fica o mês do gasto anual, em que parcela está, quando acaba…
+ * (o dia do vencimento das contas de todo mês vem de planDay).
+ */
+export function planMeta(l, mk) {
+  const last = lastMk(l);
+  if (last && last < mk) return l.rec === 'parcelas' ? `${l.count}x · terminou em ${monthShortYear(last)}` : l.rec === 'mensal' ? `terminou em ${monthShortYear(last)}` : `${monthShortYear(last)} · já passou`;
+  const parts = [];
+  if (l.rec === 'mensal') {
+    if (l.start > mk) parts.push(`a partir de ${monthShortYear(l.start)}`);
+    if (l.end) parts.push(`até ${monthShortYear(l.end)}`);
+  } else if (l.rec === 'anual') parts.push(`${listPT((l.months || []).map((m) => MES_CURTO[m - 1]))} · todo ano`);
+  else if (l.rec === 'parcelas') {
+    const n = monthDiff(l.start, mk) + 1;
+    parts.push(n >= 1 ? `parcela ${n} de ${l.count} · até ${monthShortYear(last)}` : `${l.count}x de ${monthShortYear(l.start)} a ${monthShortYear(last)}`);
+  } else if (l.rec === 'unico') parts.push(`só em ${monthShortYear(l.start)}`);
+  if (l.auto && l.type !== 'verba') parts.push('automático');
+  return parts.join(' · ');
+}
+
+/**
+ * Ordem dos itens num grupo do plano: primeiro o que vale todo mês (o maior primeiro), depois o que vem pela
+ * frente (o mais próximo primeiro) e, no fim, o que já passou.
+ */
+export function planOrder(items, mk) {
+  const rank = (l) => (ended(l, mk) ? 2 : l.rec === 'mensal' && (l.start || '') <= mk ? 0 : 1);
+  return items
+    .map((l) => ({ l, r: rank(l), n: nextMk(l, mk) || '9999-99' }))
+    .sort((a, b) => a.r - b.r || (a.r === 1 ? a.n.localeCompare(b.n) : 0) || b.l.amount - a.l.amount || a.l.name.localeCompare(b.l.name, 'pt-BR'))
+    .map((x) => x.l);
+}
+
+// ---------- conferir o plano ----------
+/** Áreas na ordem da planilha do Cerbasi; as categorias principais criadas pela pessoa vêm antes de Guardar. */
+const AREA_ORDER = ['receita', 'moradia', 'mercado', 'comer', 'transporte', 'saude', 'educacao', 'pessoal', 'lazer', 'dividas', 'filhos', 'pets', 'outros'];
+
+/**
+ * O que quase toda casa tem, por área. Cada um aparece em “Conferir o plano” até entrar no plano ou até a
+ * pessoa tocar em “Não tenho”. Já está no plano quando há um item da categoria cat; se cat é um grupo, vale
+ * qualquer item dele que não tenha sugestão própria; 'receita' e 'invest' valem qualquer item desse tipo.
+ * line: como o item novo já vem preenchido no editor (falta só o valor).
+ */
+export const PLAN_CHECKS = [
+  { id: 'renda', cat: 'receita', name: 'Salário ou renda do mês', line: { name: 'Salário', kind: 'receita', cat: 'salario', day: 5 } },
+  { id: 'aluguel', cat: 'aluguel', name: 'Aluguel ou prestação', line: { day: 10 } },
+  { id: 'condominio', cat: 'condominio', name: 'Condomínio', line: { day: 10 } },
+  { id: 'luz', cat: 'luz', name: 'Luz', line: { day: 15 } },
+  { id: 'agua', cat: 'agua', name: 'Água', line: { day: 15 } },
+  { id: 'gas', cat: 'gas', name: 'Gás' },
+  { id: 'internet', cat: 'internet', name: 'Internet', line: { day: 15 } },
+  { id: 'iptu', cat: 'iptu', name: 'IPTU', yearly: true, line: { rec: 'anual', months: [2] } },
+  { id: 'mercado', cat: 'mercado', name: 'Mercado', line: { type: 'verba' } },
+  { id: 'comer', cat: 'comer', name: 'Comer fora e delivery', line: { type: 'verba' } },
+  { id: 'transporte', cat: 'transporte', name: 'Transporte do dia a dia', line: { type: 'verba' } },
+  { id: 'manut_carro', cat: 'manut_carro', name: 'Manutenção do carro', line: { type: 'verba' } },
+  { id: 'seguro_carro', cat: 'seguro_carro', name: 'Seguro do carro', yearly: true, line: { rec: 'anual', months: [8] } },
+  { id: 'ipva', cat: 'ipva', name: 'IPVA', yearly: true, line: { rec: 'anual', months: [1] } },
+  { id: 'plano_saude', cat: 'plano_saude', name: 'Plano de saúde', line: { day: 5 } },
+  { id: 'saude', cat: 'saude', name: 'Farmácia e saúde', line: { type: 'verba' } },
+  { id: 'escola', cat: 'escola', name: 'Escola ou faculdade', line: { day: 5 } },
+  { id: 'matricula', cat: 'matricula', name: 'Matrícula e material escolar', yearly: true, line: { rec: 'anual', months: [1] } },
+  { id: 'celular', cat: 'celular', name: 'Celular', line: { day: 15 } },
+  { id: 'pessoal', cat: 'pessoal', name: 'Roupas e beleza', line: { name: 'Pessoal (roupas, beleza)', type: 'verba' } },
+  { id: 'presentes', cat: 'presentes', name: 'Presentes de fim de ano', yearly: true, line: { rec: 'anual', months: [12] } },
+  { id: 'lazer', cat: 'lazer', name: 'Passeios e diversão', line: { name: 'Lazer', type: 'verba' } },
+  { id: 'viagens', cat: 'viagens', name: 'Viagem de férias', yearly: true, line: { rec: 'anual', months: [7] } },
+  { id: 'dividas', cat: 'dividas', name: 'Empréstimos e compras parceladas', line: { name: 'Parcelas', cat: 'emprestimo', rec: 'parcelas' } },
+  { id: 'filhos', cat: 'filhos', name: 'Gastos com os filhos', line: { name: 'Filhos', type: 'verba' } },
+  { id: 'pets', cat: 'pets', name: 'Ração e veterinário', line: { name: 'Pets', type: 'verba' } },
+  { id: 'guardar', cat: 'invest', name: 'Pague-se primeiro', line: { kind: 'invest', cat: 'reserva', day: 5 } },
+];
+
+/** O item novo que a sugestão abre no editor do plano. */
+export function checkLine(ck) {
+  return { name: ck.name, kind: 'despesa', cat: ck.cat, ...(ck.line || {}) };
+}
+
+/**
+ * Conferir o plano, por área: os itens de cada área (só os que acontecem nos próximos 12 meses) e as
+ * sugestões que ainda faltam. pending = quantas faltam; skipped = as que a pessoa disse que não tem.
+ */
+export function planCheck(S, fromMk) {
+  const skip = new Set(S.core.settings.planSkip || []);
+  const byCat = {};
+  for (const ck of PLAN_CHECKS) byCat[ck.cat] = ck;
+  const visibleGroup = (id) => {
+    const c = S.core.cats.find((x) => x.id === id);
+    return !!c && c.kind === 'despesa' && !c.parent && !c.hidden;
+  };
+  const areaOf = (l) => (l.kind !== 'despesa' ? l.kind : visibleGroup(groupId(S, l.cat)) ? groupId(S, l.cat) : 'outros');
+  const areas = new Map();
+  const slot = (id) => areas.get(id) || areas.set(id, { items: [], pending: [] }).get(id);
+  const months = Array.from({ length: 12 }, (_, i) => addMonths(fromMk, i));
+  const covered = new Set();
+  for (const l of S.core.plan) {
+    if (!months.some((m) => occurs(l, m))) continue;
+    const ck = byCat[l.cat] || byCat[groupId(S, l.cat)] || (l.kind !== 'despesa' ? byCat[l.kind] : null);
+    if (ck) covered.add(ck.id);
+    slot(areaOf(l)).items.push(l);
+  }
+  let pending = 0;
+  const skipped = [];
+  for (const ck of PLAN_CHECKS) {
+    if (covered.has(ck.id)) continue;
+    const kindArea = ck.cat === 'receita' || ck.cat === 'invest';
+    const area = kindArea ? ck.cat : groupId(S, ck.cat);
+    // categoria escondida: a pessoa já disse que não usa
+    if (!kindArea && (!visibleGroup(area) || catById(S, ck.cat).hidden)) continue;
+    if (skip.has(ck.id)) skipped.push(ck);
+    else {
+      pending++;
+      slot(area).pending.push(ck);
+    }
+  }
+  const order = [...AREA_ORDER, ...groupsOf(S, 'despesa').map((g) => g.id).filter((id) => !AREA_ORDER.includes(id)), 'invest'];
+  const list = order
+    .filter((id) => areas.has(id))
+    .map((id) => {
+      const a = areas.get(id);
+      const c = id === 'receita' ? { name: 'Renda', emoji: '💼' } : id === 'invest' ? { name: 'Guardar', emoji: '🌱' } : catById(S, id);
+      return { id, name: c.name, emoji: c.emoji, items: planOrder(a.items, fromMk), pending: a.pending };
+    });
+  return { areas: list, pending, skipped };
 }
 
 // ---------- modelos para montar o plano rápido ----------

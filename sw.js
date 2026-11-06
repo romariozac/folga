@@ -1,5 +1,5 @@
 // Service worker do Folga: o app abre mesmo sem internet.
-const CACHE = 'folga-mw55gkct';
+const CACHE = 'folga-mw57z227';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/favicon.svg'];
 
 self.addEventListener('install', (e) => {
