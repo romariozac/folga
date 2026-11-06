@@ -12,8 +12,11 @@ próximos 12 meses, como na planilha dele), **pagar-se primeiro** e **acompanhar
 Para quem costuma abandonar app de finanças, cada informação aparece **num lugar só**:
 
 - **Início:** como está o mês (a sobra prevista e quanto já gastou do previsto), um aviso por vez (voltar depois de
-  uma pausa, hora de importar ou o check-in da semana) e as contas do mês para marcar.
-- **Mês:** o previsto x realizado, os gastos por categoria e os lançamentos.
+  uma pausa, hora de importar ou o check-in da semana) e as contas do mês para marcar, separadas em *A receber*,
+  *A pagar* e *A guardar*.
+- **Mês:** o previsto x realizado, os gastos por categoria e os lançamentos, separados em entradas, despesas e
+  investimento (cada parte com o total). Toque no ícone de uma categoria, ou num item dela, para ver só os lançamentos
+  dela; **Ver todos** volta ao normal.
 - **Plano:** os próximos 12 meses e os itens do plano.
 - **Metas:** o dinheiro guardado e cada meta.
 - **Importar como hábito:** uma vez por semana, ou quando a fatura fechar, importe a fatura ou o extrato: o app lança
@@ -127,7 +130,8 @@ Nubank são tratados como investimento/resgate e saques vão para *Saque em dinh
   categoria de um lançamento ou item do plano, e em *Ajustes › Categorias e atalhos* (categorias fechadas; toque para
   ver e criar subcategorias). O acerto rápido mostra só as categorias principais.
 - Em *Ajustes › Categorias e atalhos* você também escolhe os atalhos (★) e vê/apaga as regras aprendidas.
-- Na aba **Mês**, toque no nome de um grupo para ver o detalhe por item.
+- Na aba **Mês**, toque no nome de um grupo para ver o detalhe por item. Toque no ícone do grupo (ou num item aberto)
+  e os lançamentos mostram só os daquela categoria; tocar de novo, ou em **Ver todos**, volta a mostrar tudo.
 
 ## Débito automático
 

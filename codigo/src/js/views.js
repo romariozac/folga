@@ -130,13 +130,32 @@ export function billRowHTML({ line, tx }, mk, attr = 'data-act') {
   </li>`;
 }
 
+/** Entradas, despesas e o que é guardado, sempre nesta ordem e com as cores da legenda (como na tabela da aba Mês). */
+const FLOWS = [
+  { k: 'receita', cls: 'in', label: 'Entradas', bill: 'A receber' },
+  { k: 'despesa', cls: 'out', label: 'Despesas', bill: 'A pagar' },
+  { k: 'invest', cls: 'inv', label: 'Investimento', bill: 'A guardar' },
+];
+
+/** Contas separadas em “A receber”, “A pagar” e “A guardar”, para não misturar o que entra com o que sai. */
+export function billsByFlowHTML(list, mk, attr = 'data-act') {
+  return FLOWS.map((f) => {
+    const items = list.filter((b) => b.line.kind === f.k);
+    if (!items.length) return '';
+    return `<div class="flow f-${f.cls}">
+      <h3 class="flow-head"><i class="sw ${f.cls}"></i><b>${f.bill}</b></h3>
+      <ul class="bills">${items.map((b) => billRowHTML(b, mk, attr)).join('')}</ul>
+    </div>`;
+  }).join('');
+}
+
 function billsHTML(c) {
   const done = c.bills.filter((b) => b.tx).length;
   const exp = ctx.ui.billsExpanded;
   const list = exp ? c.bills : c.bills.slice(0, 5);
   return `<section class="card ${reveal()}">
     <div class="card-head"><h2>Contas do mês</h2><span class="pill">${done} de ${c.bills.length}</span></div>
-    <ul class="bills">${list.map((b) => billRowHTML(b, c.mk)).join('')}</ul>
+    ${billsByFlowHTML(list, c.mk)}
     ${c.bills.length > 5 ? `<button class="link more" data-act="bills-expand">${exp ? 'Mostrar menos' : `Ver todas (${c.bills.length})`}</button>` : ''}
   </section>`;
 }
@@ -197,6 +216,38 @@ export function homeHTML() {
 }
 
 // ---------- mês (previsto x realizado) ----------
+/** Faixa que aparece quando os lançamentos estão filtrados por categoria, com o botão para ver todos de novo. */
+function txFilterHTML(st, f) {
+  const cat = M.catById(st, f.id);
+  const gid = M.groupId(st, f.id);
+  // num item, o grupo vai na linha de cima; “Geral” é o que foi lançado direto no grupo, sem escolher um item
+  const geral = f.sub && gid === f.id;
+  const where = f.sub ? ` · ${M.catById(st, gid).name}` : '';
+  return `<div class="tx-filter" role="status">
+    <span class="emo">${geral ? '•' : cat.emoji}</span>
+    <span class="tf-txt"><small>Mostrando só${esc(where)}</small><b>${geral ? 'Geral' : esc(cat.name)}</b></span>
+    <button class="btn small primary" data-act="tx-filter-clear">${IC.close}Ver todos</button>
+  </div>`;
+}
+
+/** Lançamentos separados em entradas, despesas e investimento; dentro de cada parte, por dia (o mais novo primeiro). */
+function txsByFlowHTML(txs, mk) {
+  return FLOWS.map((fl) => {
+    const list = txs.filter((t) => t.k === fl.k);
+    if (!list.length) return '';
+    const total = U.sum(list, (t) => t.v);
+    // despesas saem (−), entradas entram (+); estornos podem deixar o total das despesas a favor
+    const sign = fl.k === 'receita' ? '+' : fl.k === 'despesa' ? (total < 0 ? '+' : '−') : '';
+    const byDay = {};
+    for (const t of list) (byDay[t.d] ||= []).push({ ...t, mk });
+    const days = Object.keys(byDay).sort().reverse();
+    return `<div class="flow f-${fl.cls}">
+      <h3 class="flow-head"><i class="sw ${fl.cls}"></i><b>${fl.label}</b><small>${list.length}</small><span class="flow-amt">${sign}${money(Math.abs(total))}</span></h3>
+      ${days.map((d) => `<h4 class="day">${U.dayLabel(d)}</h4><ul class="txs">${byDay[d].sort((a, b) => (b.t || 0) - (a.t || 0)).map(txRowHTML).join('')}</ul>`).join('')}
+    </div>`;
+  }).join('');
+}
+
 export function monthHTML() {
   rv = 0;
   const st = S();
@@ -210,6 +261,7 @@ export function monthHTML() {
   const carry = M.carryIn(st, mk);
   const neg = (v) => (v < 0 ? 'neg' : '');
 
+  const f = ctx.ui.txFilter;
   const cats = Object.values(c.byCat)
     .filter((b) => b.kind === 'despesa' && (b.prev || b.real))
     .sort((a, b) => Math.max(b.prev, b.real) - Math.max(a.prev, a.real));
@@ -232,16 +284,20 @@ export function monthHTML() {
         .sort((x, y) => Math.max(y.prev, y.real) - Math.max(x.prev, x.real));
       const canOpen = subs.length > 1 || (subs.length === 1 && subs[0].id !== b.id);
       const open = canOpen && ctx.ui.openCats.has(b.id);
+      // tocar num item mostra, nos lançamentos, só os daquele item
       const drill = open
         ? `<ul class="drill">${subs
             .map((x) => {
               const sc = M.catById(st, x.id);
-              return `<li><span>${x.id === b.id ? '•' : sc.emoji}</span><span class="d-name">${x.id === b.id ? 'Geral' : esc(sc.name)}</span><span class="d-val"><b>${m0(x.real)}</b>${x.prev ? ` <small>/ ${m0(x.prev)}</small>` : ''}</span></li>`;
+              const name = x.id === b.id ? 'Geral' : esc(sc.name);
+              const on = !!f && f.sub && f.id === x.id;
+              return `<li><button class="d-row${on ? ' on' : ''}" data-act="tx-filter" data-id="${x.id}" data-sub="1" aria-pressed="${on}" aria-label="Ver só os lançamentos de ${name}"><span>${x.id === b.id ? '•' : sc.emoji}</span><span class="d-name">${name}</span><span class="d-val"><b>${m0(x.real)}</b>${x.prev ? ` <small>/ ${m0(x.prev)}</small>` : ''}</span></button></li>`;
             })
             .join('')}</ul>`
         : '';
+      const sel = !!f && !f.sub && f.id === b.id;
       return `<li class="bl ${over ? 'over' : ''}">
-        <span class="emo">${cat.emoji}</span>
+        <button class="emo emo-btn${sel ? ' on' : ''}" data-act="tx-filter" data-id="${b.id}" aria-pressed="${sel}" aria-label="Ver só os lançamentos de ${esc(cat.name)}">${cat.emoji}</button>
         <div class="bl-main">
           <div class="bl-top">${canOpen ? `<button class="bl-btn" data-act="cat-toggle" data-id="${b.id}" aria-expanded="${open}"><b>${esc(cat.name)}</b><span class="chev ${open ? 'up' : ''}">${IC.right}</span></button>` : `<b>${esc(cat.name)}</b>`}<span><b>${m0(b.real)}</b> <small>/ ${b.prev ? m0(b.prev) : '—'}</small></span></div>
           <div class="bullet" role="img" aria-label="${esc(cat.name)}: ${m0(b.real)} de ${b.prev ? m0(b.prev) : 'sem previsão'}"><i style="width:${fill.toFixed(1)}%"></i>${mark != null ? `<em style="left:${mark.toFixed(1)}%"></em>` : ''}</div>
@@ -251,9 +307,7 @@ export function monthHTML() {
     })
     .join('');
 
-  const byDay = {};
-  for (const t of c.txs) (byDay[t.d] ||= []).push({ ...t, mk });
-  const days = Object.keys(byDay).sort().reverse();
+  const txs = f ? c.txs.filter((t) => (f.sub ? t.c === f.id : M.groupId(st, t.c) === f.id)) : c.txs;
 
   return `<section class="month-nav ${reveal()}">
       <button class="icon-btn" data-act="mk-prev" aria-label="Mês anterior">${IC.left}</button>
@@ -273,12 +327,13 @@ export function monthHTML() {
     </section>
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Gastos por categoria</h2></div>
-      <p class="card-sub">Barra: quanto já foi. Traço: o previsto.</p>
+      <p class="card-sub">Barra: quanto já foi. Traço: o previsto. Toque no ícone (ou num item aberto) para ver só os lançamentos dele.</p>
       ${bullets ? `<ul class="bullets">${bullets}</ul>` : `<div class="empty"><p>Sem gastos previstos ou lançados neste mês.</p></div>`}
     </section>
-    <section class="card ${reveal()}">
-      <div class="card-head"><h2>Lançamentos</h2><span class="pill">${c.txs.length}</span></div>
-      ${days.length ? days.map((d) => `<h3 class="day">${U.dayLabel(d)}</h3><ul class="txs">${byDay[d].sort((a, b) => (b.t || 0) - (a.t || 0)).map(txRowHTML).join('')}</ul>`).join('') : `<div class="empty"><p>Nenhum lançamento neste mês.</p></div>`}
+    <section class="card ${reveal()}" id="lancamentos">
+      <div class="card-head"><h2>Lançamentos</h2><span class="pill">${f ? `${txs.length} de ${c.txs.length}` : c.txs.length}</span></div>
+      ${f ? txFilterHTML(st, f) : ''}
+      ${txs.length ? txsByFlowHTML(txs, mk) : `<div class="empty"><p>${f ? 'Nenhum lançamento desta categoria neste mês.' : 'Nenhum lançamento neste mês.'}</p></div>`}
     </section>`;
 }
 

@@ -68,7 +68,10 @@ function setTab(tab, { scroll = true } = {}) {
   if (ctx.ui.tab !== tab) {
     ctx.ui.tab = tab;
     ctx.ui.animate = true;
-    if (tab === 'mes') ctx.ui.mk = curMk();
+    if (tab === 'mes') {
+      ctx.ui.mk = curMk();
+      ctx.ui.txFilter = null;
+    }
     if (scroll) window.scrollTo({ top: 0 });
   }
   try {
@@ -116,6 +119,23 @@ document.addEventListener('click', (e) => {
       render();
       break;
     }
+    case 'tx-filter': {
+      // tocar de novo no mesmo ícone (ou item) desfaz o filtro
+      const f = ctx.ui.txFilter;
+      const sub = !!d.sub;
+      const same = !!f && f.id === d.id && f.sub === sub;
+      ctx.ui.txFilter = same ? null : { id: d.id, sub };
+      render();
+      if (!same) {
+        const box = $('#lancamentos');
+        if (box) box.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      }
+      break;
+    }
+    case 'tx-filter-clear':
+      ctx.ui.txFilter = null;
+      render();
+      break;
     case 'fresh-start':
       A.notify('Recomeço feito. Daqui pra frente, no seu ritmo.', A.freshStart());
       render();

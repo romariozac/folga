@@ -9,6 +9,7 @@ export const ctx = {
     animate: true,
     billsExpanded: false,
     openCats: new Set(), // grupos abertos no detalhe da aba Mês
+    txFilter: null, // aba Mês: lançamentos só de uma categoria { id, sub } (sub: só aquele item, sem o resto do grupo)
     planOpen: new Set(), // grupos abertos em "Itens do plano"
     planSel: null, // mês escolhido no gráfico da aba Plano
     showDoneGoals: false,

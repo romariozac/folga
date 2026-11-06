@@ -6,7 +6,7 @@ import * as G from './game.js';
 import * as A from './actions.js';
 import { store } from './store.js';
 import { IC, $, $$, openSheet, closeSheet, sheetHead, confirmDialog, toast, vibrate } from './ui.js';
-import { legendHTML, mountChart, billRowHTML } from './views.js';
+import { legendHTML, mountChart, billsByFlowHTML } from './views.js';
 import { catBrowserHTML, catPickerHTML, catPickerClick, createFromSearch, openCategories } from './catui.js';
 import { openImport } from './importui.js';
 
@@ -509,7 +509,7 @@ export function openCheckin() {
           const dayNow = new Date().getDate();
           const pend = c.bills.filter((b) => !b.tx && (!b.line.day || b.line.day <= dayNow + 3));
           body = pend.length
-            ? `<p class="card-sub">Contas do plano que já venceram ou vencem nos próximos dias. Um toque marca.</p><ul class="bills">${pend.map((b) => billRowHTML(b, mk, 'data-ck')).join('')}</ul>`
+            ? `<p class="card-sub">Contas do plano que já venceram ou vencem nos próximos dias. Um toque marca.</p>${billsByFlowHTML(pend, mk, 'data-ck')}`
             : `<div class="empty ok"><p>${IC.check} Nenhuma conta pendente até aqui.</p></div>`;
           body += `<div class="row-btns stick"><button type="button" class="btn primary wide" data-next>Próximo</button></div>`;
         } else if (step === 1) {
