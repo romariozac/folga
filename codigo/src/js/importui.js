@@ -64,6 +64,9 @@ export function openImport() {
     guessed: 0,
     ctl: null,
     loadingMsg: '',
+    pbills: [], // contas do plano no período do extrato (para conciliar à mão)
+    concAll: false, // "No plano, sem par aqui" aberto
+    nudge: null, // conciliação: item que ainda falta responder (destacado)
   };
 
   openSheet('<div class="imp"></div>', {
@@ -86,17 +89,27 @@ export function openImport() {
       };
       const rebuild = () => {
         st.items = IM.buildBatch(S(), st.parsed, st.type, st.flip);
+        st.pbills = IM.periodBills(S(), st.items, st.type);
+        st.concAll = false;
+        st.nudge = null;
         st.guessed = 0;
-        const groups = new Map();
-        for (const it of st.items) {
-          if (it.status !== 'ask') continue;
-          const k = it.key ? `${it.kind}:${it.key}` : `#${it.fp}`;
-          if (!groups.has(k)) groups.set(k, []);
-          groups.get(k).push(it);
-        }
-        st.questions = [...groups.values()];
-        st.qi = 0;
+        regroup();
         st.acertos = IM.acertosInRange(S(), st.items);
+      };
+
+      // ---------- conciliação com o plano ----------
+      const src = () => (st.type === 'cartao' ? 'da fatura' : 'do extrato');
+      const srcIn = () => (st.type === 'cartao' ? 'na fatura' : 'no extrato');
+      const pairs = () => st.items.map((it, i) => ({ it, i })).filter(({ it }) => it.match);
+      const undecided = () => st.items.filter((it) => it.match && it.match.tier === 'talvez' && !it.link && !it.decided);
+      // contas do período sem lançamento ligado (nem sugerido, esperando resposta)
+      const looseBills = () => st.pbills.filter((b) => !st.items.some((it) => it.match && it.match.type === 'bill' && it.match.key === b.key && (it.link || !it.decided)));
+      const hasConc = () => st.items.some((it) => it.match) || st.pbills.length > 0;
+      const afterConc = () => {
+        st.nudge = null;
+        regroup();
+        st.step = st.questions.length ? 'ask' : 'review';
+        draw();
       };
 
       const counts = () => {
@@ -191,11 +204,202 @@ export function openImport() {
           <p class="card-sub">Eu reconheço estabelecimentos comuns (iFood, Uber, Netflix, postos, farmácias…) e aprendo com as suas respostas: da próxima vez, pergunto menos.</p>
           ${st.guessed ? `<p class="ok-line">${IC.check} ${U.plural(st.guessed, 'palpite aceito', 'palpites aceitos')}. Você confere na revisão.</p>` : ''}
           ${guessHTML()}
+          ${concSumHTML()}
           <div class="row-btns stick">${
-            st.questions.length
-              ? `<button type="button" class="btn lime wide" data-go="ask">Responder ${U.plural(st.questions.length, 'pergunta', 'perguntas')}</button>`
-              : `<button type="button" class="btn primary wide" data-go="review">Revisar e lançar</button>`
+            hasConc()
+              ? `<button type="button" class="btn lime wide" data-go="conc">Conciliar com o plano</button>`
+              : st.questions.length
+                ? `<button type="button" class="btn lime wide" data-go="ask">Responder ${U.plural(st.questions.length, 'pergunta', 'perguntas')}</button>`
+                : `<button type="button" class="btn primary wide" data-go="review">Revisar e lançar</button>`
           }</div>`;
+      };
+
+      /** Resumo da conciliação na primeira tela: o que já está no plano e o que falta conferir. */
+      const concSumHTML = () => {
+        if (!hasConc()) return '';
+        const ok = st.items.filter((it) => it.link && it.match.type === 'bill');
+        const dup = st.items.filter((it) => it.link && it.match.type === 'tx');
+        const tv = undecided();
+        const lines = [];
+        const names = ok.map((it) => it.billName);
+        if (ok.length) lines.push(`<b>${U.plural(ok.length, 'já está', 'já estão')} no plano:</b> ${esc(names.length > 4 ? `${names.slice(0, 3).join(', ')} e mais ${names.length - 3}` : U.listPT(names))}`);
+        if (tv.length) lines.push(`<b>${tv.length} para conferir:</b> ${tv.length === 1 ? 'pode ser do plano' : 'podem ser do plano'}`);
+        if (dup.length) lines.push(`${U.plural(dup.length, 'lançamento que você já tinha feito', 'lançamentos que você já tinha feito')}`);
+        if (!lines.length) lines.push(`Nada bateu sozinho com o plano. Confira as contas deste período na próxima tela.`);
+        return `<div class="conc-sum"><span class="imp-ic">🔗</span><div><h3>Conciliação com o plano</h3>${lines.map((l) => `<p>${l}</p>`).join('')}</div></div>`;
+      };
+
+      const LBL = {
+        despesa: { done: 'paga', open: 'a pagar' },
+        receita: { done: 'recebida', open: 'a receber' },
+        invest: { done: 'guardada', open: 'a guardar' },
+      };
+      /** "dia 5", "dia 5 de novembro" (conta de outro mês), "novembro" (sem dia) e a parcela. */
+      const billWhen = (b, refMk = null) => {
+        const parts = [];
+        const other = refMk && b.mk !== refMk;
+        if (b.line.day) parts.push(`dia ${b.line.day}${other ? ` de ${U.monthName(b.mk)}` : ''}`);
+        else parts.push(U.monthName(b.mk));
+        const par = M.parcelaOf(b.line, b.mk);
+        if (par) parts.push(`parcela ${par.n} de ${par.total}`);
+        return parts.join(' · ');
+      };
+      const billState = (b) => {
+        const t = b.tx;
+        if (!t) return LBL[b.line.kind].open;
+        return `${t.auto ? 'marcada sozinha' : 'marcada por você'}${t.v !== b.line.amount ? ` com ${money(t.v)}` : ''}`;
+      };
+
+      /** Um par: o lançamento do extrato em cima, o item do plano (ou o que você já lançou) embaixo. */
+      const cardHTML = ({ it, i }) => {
+        const m = it.match;
+        const on = !!it.link;
+        const und = m.tier === 'talvez' && !on && !it.decided;
+        const sign = it.kind === 'receita' ? '+' : '−';
+        const ext = `<div class="cc-row"><span class="cc-tag">${st.type === 'cartao' ? 'Fatura' : 'Extrato'}</span><span class="cc-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)}</small></span><span class="cc-amt${it.kind === 'receita' ? ' k-receita' : ''}">${sign}${money(it.amount)}</span></div>`;
+        let other;
+        let out;
+        let warn = false;
+        if (m.type === 'bill') {
+          const c = M.catById(S(), m.line.cat);
+          const name = `“${esc(m.line.name)}”`;
+          other = `<div class="cc-row"><span class="cc-tag">Plano</span><span class="cc-txt"><b>${c.emoji} ${esc(m.line.name)}</b><small>${billWhen(m, U.mkOf(it.date))} · ${billState(m)}</small></span><span class="cc-amt">${money(m.line.amount)}</span></div>`;
+          if (on && m.tx) out = m.tx.v === it.amount ? `Fica só o lançamento ${src()}, no lugar da marcação.` : `Fica só o lançamento ${src()}: ${money(it.amount)} no lugar dos ${money(m.tx.v)} marcados.`;
+          else if (on) out = `${name} fica ${LBL[m.line.kind].done}, com ${money(it.amount)}.`;
+          else if (und) out = 'É o mesmo? Se não for, ele entra separado.';
+          else if (m.tx) {
+            out = `Entra separado e ${name} continua marcada: conta duas vezes.`;
+            warn = true;
+          } else out = `Entra separado; ${name} continua ${LBL[m.line.kind].open}.`;
+        } else {
+          const t = m.tx;
+          const c = M.catById(S(), t.c);
+          other = `<div class="cc-row"><span class="cc-tag">Lançado</span><span class="cc-txt"><b>${c.emoji} ${esc(m.name)}</b><small>por você · ${U.dayLabel(t.d).toLowerCase()}</small></span><span class="cc-amt">${money(t.v)}</span></div>`;
+          if (on) out = 'Não lança de novo: fica o que você lançou.';
+          else {
+            out = 'Lança de novo: fica duas vezes.';
+            warn = true;
+          }
+        }
+        const why = m.why && m.why.length ? `<p class="cc-why">${esc(m.why.join(' · '))}</p>` : '';
+        return `<li class="cc${on ? ' on' : ''}${und ? ' und' : ''}${st.nudge === i ? ' nudge' : ''}" data-cc="${i}">
+          ${ext}${other}${why}
+          <div class="seg full cc-seg" role="group" aria-label="É o mesmo?">
+            <button type="button" data-link="${i}" data-on="1" class="${on ? 'on' : ''}" aria-pressed="${on}">${IC.check}É o mesmo</button>
+            <button type="button" data-link="${i}" data-on="0" class="${!on && !und ? 'on' : ''}" aria-pressed="${!on && !und}">Não é</button>
+          </div>
+          <p class="cc-out${warn ? ' warn' : ''}">${out}</p>
+          ${m.type === 'bill' && !on ? `<button type="button" class="link small" data-other="${i}">Escolher outro item do plano</button>` : ''}
+        </li>`;
+      };
+
+      const looseRowHTML = (b) => {
+        const c = M.catById(S(), b.line.cat);
+        return `<li><button type="button" class="tx" data-find="${esc(b.key)}"><span class="emo">${c.emoji}</span><span class="tx-txt"><b>${esc(b.line.name)}</b><small>${billWhen(b)} · ${billState(b)}</small></span><span class="tx-amt">${money(b.tx ? b.tx.v : b.line.amount)}</span></button></li>`;
+      };
+
+      const concHTML = () => {
+        const all = pairs();
+        const byDate = (a, b) => a.it.date.localeCompare(b.it.date);
+        const tv = all.filter(({ it }) => it.match.tier === 'talvez').sort(byDate);
+        const ok = all.filter(({ it }) => it.match.tier !== 'talvez' && it.match.type === 'bill').sort(byDate);
+        const dup = all.filter(({ it }) => it.match.tier !== 'talvez' && it.match.type === 'tx').sort(byDate);
+        const loose = looseBills();
+        const showLoose = st.concAll || !all.length;
+        const left = undecided().length;
+        return `${sheetHead('Conciliação com o plano', `O que veio ${srcIn()} e já está no seu plano. Confirme para nada contar duas vezes.`)}
+          ${tv.length ? `<h3 class="group">Confira<span>${tv.length === 1 ? 'é o mesmo?' : 'são os mesmos?'}</span></h3><ul class="cc-list">${tv.map(cardHTML).join('')}</ul>` : ''}
+          ${ok.length ? `<h3 class="group">Já estão no plano<span>${ok.length}</span></h3><ul class="cc-list">${ok.map(cardHTML).join('')}</ul>` : ''}
+          ${dup.length ? `<h3 class="group">Você já tinha lançado<span>${dup.length}</span></h3><ul class="cc-list">${dup.map(cardHTML).join('')}</ul>` : ''}
+          ${all.length ? '' : `<p class="card-sub">Nenhum lançamento ${src()} bateu sozinho com o plano.</p>`}
+          ${
+            loose.length
+              ? `<h3 class="group">No plano, sem par aqui<span>${loose.length}</span></h3>${
+                  showLoose
+                    ? `<p class="help">Alguma delas está ${srcIn()} com outro nome ou valor? Toque nela e escolha o lançamento: assim não conta duas vezes.</p><ul class="txs">${loose.map(looseRowHTML).join('')}</ul>`
+                    : `<button type="button" class="link" data-conc-all>Ver ${loose.length === 1 ? 'a conta' : `as ${loose.length} contas`}</button>`
+                }`
+              : ''
+          }
+          <div class="row-btns stick conc-btns">
+            <button type="button" class="btn ghost" data-go="found">Voltar</button>
+            <button type="button" class="btn lime" data-conc-done>${left ? `Continuar · falta${left > 1 ? 'm' : ''} ${left}` : 'Continuar'}</button>
+          </div>`;
+      };
+
+      /** Folha para escolher: qual lançamento do extrato é esta conta do plano. */
+      const findFor = (key) => {
+        const b = st.pbills.find((x) => x.key === key);
+        if (!b) return;
+        const list = IM.itemsFor(st.items, b);
+        let picked = null;
+        const rows = list
+          .map(({ it, i }) => {
+            const c = it.cat ? M.catById(S(), it.cat) : { emoji: '❔' };
+            const tag = it.link && it.match && it.match.type === 'bill' ? ` · ligado a “${esc(it.match.line.name)}”` : it.link ? ' · você já tinha lançado' : '';
+            return `<li><button type="button" class="tx" data-pick="${i}"><span class="emo">${c.emoji}</span><span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)}${tag}</small></span><span class="tx-amt${it.kind === 'receita' ? ' k-receita' : ''}">${money(it.amount)}</span></button></li>`;
+          })
+          .join('');
+        openSheet(
+          `${sheetHead(`Qual é “${esc(b.line.name)}”?`, `No plano: ${money(b.line.amount)} · ${billWhen(b)}. Escolha o lançamento ${src()}.`)}
+          ${rows ? `<ul class="txs">${rows}</ul>` : `<p class="card-sub">Não há ${b.line.kind === 'receita' ? 'entradas' : b.line.kind === 'invest' ? 'aplicações' : 'gastos'} ${src()} para ligar.</p>`}`,
+          {
+            cls: 'sheet-tall',
+            label: 'Escolher o lançamento',
+            onMount: (el, close) =>
+              el.addEventListener('click', (e) => {
+                const r = e.target.closest('[data-pick]');
+                if (!r) return;
+                picked = st.items[+r.dataset.pick];
+                close();
+              }),
+            onClose: () => {
+              if (!picked) return;
+              IM.linkTo(st.items, picked, b);
+              picked.decided = true;
+              vibrate(8);
+              draw(true);
+            },
+          }
+        );
+      };
+
+      /** Folha para escolher outro item do plano para um lançamento (ou nenhum). */
+      const otherFor = (i) => {
+        const it = st.items[i];
+        const list = IM.billsFor(S(), it);
+        let picked = null;
+        const rows = list
+          .map((b, k) => {
+            const c = M.catById(S(), b.line.cat);
+            const owner = st.items.find((o) => o !== it && o.link && o.match && o.match.type === 'bill' && o.match.key === b.key);
+            const cur = it.match && it.match.type === 'bill' && it.match.key === b.key;
+            return `<li><button type="button" class="tx${cur ? ' cur' : ''}" data-pickb="${k}"><span class="emo">${c.emoji}</span><span class="tx-txt"><b>${esc(b.line.name)}</b><small>${billWhen(b, U.mkOf(it.date))} · ${billState(b)}${owner ? ` · ligado a ${esc(owner.desc)}` : ''}</small></span><span class="tx-amt">${cur ? IC.check : ''}${money(b.line.amount)}</span></button></li>`;
+          })
+          .join('');
+        openSheet(
+          `${sheetHead('Qual item do plano é este?', `${esc(it.desc)} · ${money(it.amount)} · ${U.dayLabel(it.date).toLowerCase()}`)}
+          <ul class="txs">${rows}<li><button type="button" class="tx" data-pickb="none"><span class="emo">➖</span><span class="tx-txt"><b>Nenhum</b><small>Entra separado, como um lançamento comum</small></span></button></li></ul>`,
+          {
+            cls: 'sheet-tall',
+            label: 'Escolher o item do plano',
+            onMount: (el, close) =>
+              el.addEventListener('click', (e) => {
+                const r = e.target.closest('[data-pickb]');
+                if (!r) return;
+                picked = r.dataset.pickb === 'none' ? 'none' : list[+r.dataset.pickb];
+                close();
+              }),
+            onClose: () => {
+              if (!picked) return;
+              if (picked === 'none') IM.setLink(it, false);
+              else IM.linkTo(st.items, it, picked);
+              it.decided = true;
+              vibrate(8);
+              draw(true);
+            },
+          }
+        );
       };
 
       const guessHTML = () => {
@@ -248,7 +452,7 @@ export function openImport() {
         const sign = it.kind === 'receita' || it.refund ? '+' : '−';
         return `<li><button type="button" class="tx" data-change="${i}">
           <span class="emo">${c.emoji}</span>
-          <span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)} · ${esc(c.name)}${it.billName ? ` · conta “${esc(it.billName)}”` : ''}${it.refund ? ' · estorno' : ''}${it.parc ? ' · parcela' : ''}${it.how === 'palpite' ? ' · palpite' : it.how === 'banco' ? ' · categoria do banco' : ''}${extra}</small></span>
+          <span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)} · ${it.billName ? `🔗 ${esc(it.billName)}` : esc(c.name)}${it.refund ? ' · estorno' : ''}${it.parc ? ' · parcela' : ''}${it.how === 'palpite' ? ' · palpite' : it.how === 'banco' ? ' · categoria do banco' : ''}${extra}</small></span>
           <span class="tx-amt ${it.kind === 'receita' || it.refund ? 'k-receita' : ''}">${sign}${money(it.amount)}</span></button></li>`;
       };
 
@@ -270,7 +474,8 @@ export function openImport() {
             ${guardado ? `<div><span>Guardado</span><b>${m0(guardado)}</b></div>` : ''}
             <div><span>Lançamentos</span><b>${add.length}</b></div>
           </div>
-          ${bills.length ? `<p class="ok-line">${IC.check} ${U.plural(bills.length, 'conta do plano encontrada', 'contas do plano encontradas')} e marcada${bills.length > 1 ? 's' : ''} como paga${bills.length > 1 ? 's' : ''}: ${esc(U.listPT(bills.map(({ it }) => it.billName)))}.</p>` : ''}
+          ${bills.length ? `<p class="ok-line">${IC.check} ${U.plural(bills.length, 'conciliado', 'conciliados')} com o plano: ${esc(U.listPT(bills.map(({ it }) => it.billName)))}.</p>` : ''}
+          ${hasConc() ? `<button type="button" class="link" data-go="conc">${bills.length ? 'Rever a conciliação' : 'Conciliar com o plano'}</button>` : ''}
           ${
             st.acertos && st.acertos.list.length
               ? `<label class="tog"><input type="checkbox" data-replace ${st.replace ? 'checked' : ''}><span>Trocar ${m0(st.acertos.total)} de acertos aproximados (de ${U.dayLabel(st.acertos.from).toLowerCase()} a ${U.dayLabel(st.acertos.to).toLowerCase()}) pelos valores reais</span></label>`
@@ -285,15 +490,18 @@ export function openImport() {
           <div class="row-btns stick"><button type="button" class="btn lime wide" data-commit ${add.length ? '' : 'disabled'}>Lançar ${U.plural(add.length, 'item', 'itens')} · +30 XP</button></div>`;
       };
 
-      const draw = () => {
+      const draw = (keepScroll = false) => {
+        const s0 = sheet();
+        const y = s0 ? s0.scrollTop : 0;
         if (st.step === 'loading')
           box.innerHTML = `${sheetHead('Lendo…')}<div class="splash small"><span class="brand-mark big">f</span><p data-loading-msg>${esc(st.loadingMsg)}</p>${st.ctl ? '<button type="button" class="btn ghost" data-stop>Parar</button>' : ''}</div>`;
         else if (st.step === 'found') box.innerHTML = foundHTML();
         else if (st.step === 'ask') box.innerHTML = askHTML();
         else if (st.step === 'review') box.innerHTML = reviewHTML();
+        else if (st.step === 'conc') box.innerHTML = concHTML();
         else box.innerHTML = sourceHTML();
         const s = sheet();
-        if (s) s.scrollTop = 0;
+        if (s) s.scrollTop = keepScroll ? y : 0;
       };
 
       const answer = (cat) => {
@@ -396,6 +604,40 @@ export function openImport() {
           draw();
           return;
         }
+        const lk = t('[data-link]');
+        if (lk) {
+          const i = +lk.dataset.link;
+          const it = st.items[i];
+          if (lk.dataset.on === '1') IM.linkOnly(st.items, it);
+          else IM.setLink(it, false);
+          it.decided = true;
+          if (st.nudge === i) st.nudge = null;
+          vibrate(8);
+          draw(true);
+          return;
+        }
+        const ot = t('[data-other]');
+        if (ot) return otherFor(+ot.dataset.other);
+        const fd = t('[data-find]');
+        if (fd) return findFor(fd.dataset.find);
+        if (t('[data-conc-all]')) {
+          st.concAll = true;
+          draw(true);
+          return;
+        }
+        if (t('[data-conc-done]')) {
+          const left = undecided();
+          if (left.length) {
+            // falta responder: leva até o primeiro que está em dúvida
+            st.nudge = st.items.indexOf(left[0]);
+            draw(true);
+            const card = $(`[data-cc="${st.nudge}"]`, box);
+            if (card) card.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+            toast(left.length === 1 ? 'Falta responder este: é o mesmo ou não?' : `Faltam ${left.length}: é o mesmo ou não?`);
+            return;
+          }
+          return afterConc();
+        }
         const go = t('[data-go]');
         if (go) {
           st.step = go.dataset.go;
@@ -442,7 +684,7 @@ export function openImport() {
         if (t('[data-flip]')) {
           st.flip = !st.flip;
           rebuild();
-          st.step = st.questions.length ? 'found' : 'review';
+          st.step = st.questions.length || hasConc() ? 'found' : 'review';
           draw();
           return;
         }
@@ -460,6 +702,10 @@ export function openImport() {
         const inc = t('[data-include]');
         if (inc) {
           const it = st.items[+inc.dataset.include];
+          if (it.link) {
+            IM.setLink(it, false);
+            it.decided = true;
+          }
           let cat = it.cat;
           if (!cat) cat = await pickCategory(it.kind, { title: 'Categoria', sub: it.desc });
           if (cat) {
@@ -474,7 +720,7 @@ export function openImport() {
           close();
           ctx.render();
           A.notify(
-            `Importado: <b>${U.plural(res.count, 'lançamento', 'lançamentos')}</b>${res.out ? ` · gastos ${m0(res.out)}` : ''}${res.inn ? ` · receitas ${m0(res.inn)}` : ''}.`,
+            `Importado: <b>${U.plural(res.count, 'lançamento', 'lançamentos')}</b>${res.linked ? ` (${U.plural(res.linked, 'conciliado', 'conciliados')} com o plano)` : ''}${res.out ? ` · gastos ${m0(res.out)}` : ''}${res.inn ? ` · receitas ${m0(res.inn)}` : ''}.`,
             res.events,
             res.count
               ? {

@@ -616,7 +616,6 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
     const inter = B.filter((w) => A.has(w)).length;
     return inter / Math.min(A.size, B.length) >= 0.6;
   };
-  const takenBills = new Set();
 
   // Parcelas (ex.: "LOJA 08/10") aparecem com a data da compra original: contam no mês desta fatura.
   const PARC = /\b(\d{1,2})\/(\d{1,2})\b/;
@@ -685,43 +684,340 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
     return q;
   });
 
-  // 4) duplicados de lançamentos feitos à mão (mesmo valor, até 3 dias de diferença)
-  for (const it of items) {
-    if (it.status === 'ignore' || it.status === 'dup') continue;
-    const kind = it.kind;
-    const match = existing.find(
-      (t) => !t.used && !t.im && !t.ap && t.k === kind && Math.abs(t.v) === it.amount && (t.p ? t.mk === U.mkOf(it.date) : Math.abs(U.daysBetween(t.d, it.date)) <= 3)
-    );
-    if (match) {
-      match.used = true;
-      it.status = 'dup';
-      it.reason = `Parece que você já lançou: ${match.n || M.catById(S, match.c).name} em ${U.dayLabel(match.d).toLowerCase()}`;
-      it.dupOf = match.id;
-    }
-  }
-
-  // 5) contas do plano: valor igual (±2%) no mesmo mês → marca a conta como paga
+  // 4) já lançado à mão (mesmo valor, até 3 dias de diferença): não lança de novo. Aparece na conciliação,
+  // onde dá para dizer que não é o mesmo. Contas do plano já marcadas ficam para o passo 5.
   for (const it of items) {
     if (it.status === 'ignore' || it.status === 'dup' || it.refund) continue;
-    const mk = U.mkOf(it.date);
-    const c = M.monthCalc(S, mk);
-    const cands = c.bills.filter((b) => !b.tx && b.line.kind === it.kind && !takenBills.has(b.line.id + mk) && Math.abs(b.line.amount - it.amount) <= Math.max(100, b.line.amount * 0.02));
-    if (!cands.length) continue;
-    const words = new Set(it.nd.split(/[^a-z0-9]+/).filter((w) => w.length > 3));
-    const generic = GENERIC_RE.test(it.nd) || /boleto|debito automatico|deb aut|convenio/.test(it.nd) ? 1 : 0;
-    const scored = cands
-      .map((b) => {
-        const overlap = norm(b.line.name).split(/[^a-z0-9]+/).filter((w) => words.has(w)).length;
-        const sameGroup = it.cat && M.groupId(S, it.cat) === M.groupId(S, b.line.cat) ? 2 : 0;
-        return { b, s: (b.line.amount === it.amount ? 2 : 0) + overlap * 3 + sameGroup + generic };
-      })
-      .sort((a, b) => b.s - a.s);
-    if (scored[0].s < 3 || (cands.length > 1 && scored[0].s === scored[1].s)) continue;
-    const line = scored[0].b.line;
-    takenBills.add(line.id + mk);
-    Object.assign(it, { p: line.id, billName: line.name, billMk: mk, cat: line.cat, status: 'add', how: 'plano' });
+    const t = existing.find((x) => !x.used && !x.im && !x.ap && !x.p && x.k === it.kind && x.v === it.amount && Math.abs(U.daysBetween(x.d, it.date)) <= 3);
+    if (!t) continue;
+    t.used = true;
+    it.match = { type: 'tx', tx: t, mk: t.mk, name: t.n || M.catById(S, t.c).name, tier: 'ok' };
+    setLink(it, true);
   }
+
+  // 5) contas do plano (pagas ou não): conciliação
+  reconcile(S, items);
   return items;
+}
+
+// ---------- conciliação com o plano ----------
+// Um lançamento do extrato pode ser o pagamento de uma conta do plano (aluguel, luz, Netflix, salário…).
+// Ligado à conta, ele a deixa paga; se ela já estava marcada (à mão ou no automático), ele fica no lugar da
+// marcação, com o valor e a data reais. Assim nada conta duas vezes.
+
+export const CONC_MIN = 4.5; // a partir desta nota o par aparece na conciliação
+export const CONC_LINK = 6; // a partir desta nota já vem ligado (a pessoa pode desligar)
+const PAY_RE = /\b(pix|ted|doc|tev|transf|transferencia|boleto|pagamento|pagto|pgto|pag|debito automatico|deb aut|debito aut|convenio|titulo|tit|cobranca|sispag)\b/;
+const PARC_RE = /\b(\d{1,2})\s*\/\s*(\d{1,2})\b/;
+const SURE_HOW = new Set(['regra', 'auto', 'histórico', 'banco']);
+// palavras comuns em nomes de itens do plano; o resto ("Netflix", "Maria") é nome próprio e precisa aparecer no extrato
+const PLAN_WORDS =
+  'conta contas mensalidade mensal parcela parcelas fatura casa carro moto plano escola faculdade curso aula aulas ingles natacao seguro vida residencial financiamento emprestimo consorcio cartao anuidade tarifa assinatura assinaturas clube academia internet telefone celular energia agua luz gas diarista faxina empregada pagamento aluguel prestacao condominio iptu ipva saude remedio remedios escolar material matricula salario renda extra bolsa pensao auxilio beneficio aposentadoria comissao bonus vale reserva investimento investimentos guardar guardado meta poupanca previdencia combustivel gasolina mercado pague primeiro filho filhos filha escolinha creche mesada apartamento apto imovel ajuda mae pai avo irmao irma tia tio sogra sogro esposa marido dizimo oferta igreja doacao'.split(
+    ' '
+  );
+
+/** Contas do plano (não as verbas) de um mês, com o pagamento já marcado, se houver. */
+export function billsOf(S, mk) {
+  const txs = M.txOf(S, mk);
+  return S.core.plan
+    .filter((l) => l.type !== 'verba' && M.occurs(l, mk))
+    .map((l) => ({ key: `${l.id}@${mk}`, line: l, mk, due: l.day ? `${mk}-${U.pad(Math.min(l.day, U.daysInMonth(mk)))}` : null, tx: txs.find((t) => t.p === l.id) || null }));
+}
+
+/** Índices usados para dar nota aos pares. */
+export function concContext(S) {
+  const matcher = M.buildMatcher(S);
+  const months = new Map();
+  const billsAt = (mk) => {
+    if (!months.has(mk)) months.set(mk, billsOf(S, mk));
+    return months.get(mk);
+  };
+  // de quem vieram os pagamentos já conciliados de cada conta ("JOAO SILVA" foi o aluguel da última vez)
+  const keys = new Map();
+  for (const mk of Object.keys(S.months))
+    for (const t of S.months[mk].tx) {
+      if (!t.p || !t.im || !t.n) continue;
+      const k = merchantKey(t.n);
+      if (!k) continue;
+      if (!keys.has(t.p)) keys.set(t.p, new Set());
+      keys.get(t.p).add(k);
+    }
+  const vocab = new Set(PLAN_WORDS);
+  for (const c of S.core.cats) for (const w of tokensOf(c.name)) vocab.add(w);
+  const cats = new Map();
+  // a categoria do item e a que o nome dele indica ("Luz" num item de Moradia → Luz)
+  const catsOf = (l) => {
+    if (!cats.has(l.id)) {
+      const set = new Set([l.cat]);
+      const k = M.kwMatch(matcher, l.kind, l.name);
+      if (k && M.groupId(S, k) === M.groupId(S, l.cat)) set.add(k);
+      cats.set(l.id, set);
+    }
+    return cats.get(l.id);
+  };
+  const toks = new Map();
+  const toksOf = (str) => {
+    if (!toks.has(str)) toks.set(str, tokensOf(str));
+    return toks.get(str);
+  };
+  return { billsAt, keys, vocab, catsOf, toksOf };
+}
+
+/**
+ * Nota de um par (lançamento do extrato, conta do plano), os motivos e se há sinal de que é a mesma coisa
+ * (idn: mesmo nome, mesma categoria, igual da última vez, a parcela certa). Só o valor batendo não basta para
+ * ligar sozinho: aí a pessoa confirma. null = não pode ser.
+ */
+export function scorePair(S, it, b, cx) {
+  const line = b.line;
+  if (line.kind !== it.kind) return null;
+  const paid = b.tx && !b.tx.im ? b.tx : null;
+  // vale o valor do plano ou o que já foi marcado, o que estiver mais perto
+  const ad = Math.min(Math.abs(it.amount - line.amount), paid ? Math.abs(it.amount - paid.v) : Infinity);
+  const rel = ad / Math.max(it.amount, 1);
+  const why = [];
+  let s;
+  if (ad <= 1) {
+    s = 5;
+    why.push('mesmo valor');
+  } else if (ad <= 100 || rel <= 0.02) {
+    s = 4;
+    why.push('valor quase igual');
+  } else if (rel <= 0.1) s = 2;
+  else if (rel <= 0.4) s = 0;
+  else return null;
+  const dd = b.due ? Math.abs(U.daysBetween(it.date, b.due)) : 99;
+  if (b.mk === U.mkOf(it.date)) {
+    if (dd <= 5) {
+      s += 1.5;
+      why.push('perto do vencimento');
+    }
+  } else if (dd > 10) return null;
+  else s -= 1;
+  let idn = false;
+  let sure = false;
+  // marcada à mão com um valor digitado (não o do plano) e o extrato traz exatamente esse valor
+  if (paid && !paid.auto && paid.v !== line.amount && Math.abs(it.amount - paid.v) <= 1) {
+    s += 3;
+    idn = true;
+    why.push('o valor que você marcou');
+  }
+  // quem é: o mesmo da última vez, o mesmo nome, a parcela certa
+  if (it.key && cx.keys.has(line.id) && cx.keys.get(line.id).has(it.key)) {
+    s += 6;
+    idn = sure = true;
+    why.push('igual da última vez');
+  }
+  const lt = cx.toksOf(line.name);
+  const dt = cx.toksOf(it.desc);
+  const near = (a, c) => a === c || (a.length >= 5 && c.length >= 5 && (a.startsWith(c) || c.startsWith(a)));
+  if (lt.some((w) => dt.some((d) => near(w, d)))) {
+    s += 4;
+    idn = sure = true;
+    why.push('mesmo nome');
+  }
+  const pm = line.rec === 'parcelas' && it.desc.match(PARC_RE);
+  if (pm && +pm[2] === line.count) {
+    const n = M.parcelaOf(line, b.mk).n;
+    if (+pm[1] === n) {
+      s += 5;
+      idn = sure = true;
+      why.push(`parcela ${n} de ${line.count}`);
+    } else if (Math.abs(+pm[1] - n) === 1) s += 2;
+  }
+  // a categoria do lançamento (quando o app já sabe)
+  const cats = cx.catsOf(line);
+  if (it.cat && cats.has(it.cat)) {
+    s += 4;
+    idn = true;
+    why.push('mesma categoria');
+    if (cx.billsAt(b.mk).filter((o) => o.line.kind === it.kind && cx.catsOf(o.line).has(it.cat)).length === 1) s += 1.5;
+  } else if (it.cat && M.groupId(S, it.cat) === M.groupId(S, line.cat)) {
+    s += 1.5;
+    idn = true;
+  } else if (!sure && it.cat && it.kind === 'despesa' && SURE_HOW.has(it.how)) s -= 3;
+  // nome próprio no plano ("Netflix", "Diarista Maria") que não aparece no extrato
+  if (!sure && it.kind !== 'invest' && lt.some((w) => !cx.vocab.has(w))) s -= 4;
+  if (it.kind !== 'invest' && PAY_RE.test(it.nd || norm(it.desc))) s += 1;
+  // investimento e receita: poucas contas de cada, então o mesmo valor já diz bastante
+  if (it.kind !== 'despesa' && ad <= 100) idn = true;
+  return { s, why, dd, ad, idn };
+}
+
+/** Pode entrar na conciliação: vai ser lançado (ou é pergunta) e não é estorno. */
+const concOpen = (it) => (it.status === 'add' || it.status === 'ask') && !it.refund && !it.match;
+
+/**
+ * Acha a conta do plano de cada lançamento, uma conta para cada lançamento. Pares com sinal de que é a mesma
+ * coisa vêm primeiro (o débito da Energisa ganha do Pix de mesmo valor para a conta de luz) e já vêm ligados;
+ * os outros ficam para a pessoa confirmar.
+ */
+export function reconcile(S, items, cx = concContext(S)) {
+  const pairs = [];
+  for (const it of items) {
+    if (!concOpen(it)) continue;
+    const mk = U.mkOf(it.date);
+    for (const m of [U.addMonths(mk, -1), mk, U.addMonths(mk, 1)])
+      for (const b of cx.billsAt(m)) {
+        if (b.tx && b.tx.im) continue; // já conciliada numa importação anterior
+        const r = scorePair(S, it, b, cx);
+        if (r && r.s >= CONC_MIN) pairs.push({ it, b, ...r });
+      }
+  }
+  pairs.sort((x, y) => y.idn - x.idn || y.s - x.s || x.dd - y.dd || x.ad - y.ad);
+  const usedB = new Set();
+  const usedI = new Set();
+  const chosen = [];
+  for (const p of pairs) {
+    if (usedB.has(p.b.key) || usedI.has(p.it)) continue;
+    usedB.add(p.b.key);
+    usedI.add(p.it);
+    chosen.push(p);
+  }
+  for (const p of chosen) {
+    // empate com outra conta que ficou sem par (ex.: duas contas de mesmo valor): a pessoa escolhe
+    const tie = pairs.some((q) => q.it === p.it && q.b.key !== p.b.key && q.idn === p.idn && q.s >= p.s - 0.01 && !usedB.has(q.b.key));
+    const ok = p.idn && p.s >= CONC_LINK && !tie;
+    p.it.match = { type: 'bill', ...p.b, s: p.s, why: p.why, tier: ok ? 'ok' : 'talvez' };
+    if (ok) setLink(p.it, true);
+  }
+}
+
+/** Liga (ou desliga) o lançamento ao par. Guarda como ele estava, para voltar igual se desligar. */
+export function setLink(it, on) {
+  if (!it.match || !!it.link === on) return;
+  if (on) {
+    it.pre = { status: it.status, cat: it.cat, how: it.how, reason: it.reason };
+    const m = it.match;
+    if (m.type === 'bill') Object.assign(it, { status: 'add', cat: m.line.cat, how: 'plano', p: m.line.id, billName: m.line.name, billMk: m.mk, replaces: m.tx ? { mk: m.mk, id: m.tx.id } : null });
+    else Object.assign(it, { status: 'dup', reason: `Você já lançou: ${m.name} em ${U.dayLabel(m.tx.d).toLowerCase()}`, dupOf: m.tx.id });
+    it.link = true;
+  } else {
+    Object.assign(it, it.pre);
+    for (const k of ['p', 'billName', 'billMk', 'replaces', 'dupOf']) delete it[k];
+    it.link = false;
+  }
+}
+
+/** Liga um lançamento ao par dele e desliga quem estava com a mesma conta (cada conta paga uma vez). */
+export function linkOnly(items, it) {
+  if (it.match && it.match.type === 'bill') for (const o of items) if (o !== it && o.link && o.match && o.match.type === 'bill' && o.match.key === it.match.key) setLink(o, false);
+  setLink(it, true);
+}
+
+/** “É esta conta”, escolhida à mão: troca o par do lançamento. */
+export function linkTo(items, it, b) {
+  setLink(it, false);
+  it.match = { type: 'bill', ...b, s: 99, why: ['você escolheu'], tier: it.match ? it.match.tier : 'ok', manual: true };
+  linkOnly(items, it);
+}
+
+/** Contas do plano no período do extrato, para achar à mão as que não bateram sozinhas. */
+export function periodBills(S, items, type) {
+  const dates = items.filter((i) => i.status !== 'ignore').map((i) => i.date).sort();
+  if (!dates.length) return [];
+  const from = U.addDays(dates[0], -3);
+  const to = U.addDays(dates[dates.length - 1], 3);
+  const out = [];
+  for (let mk = U.mkOf(from); mk <= U.mkOf(to); mk = U.addMonths(mk, 1))
+    for (const b of billsOf(S, mk)) {
+      if (b.tx && b.tx.im) continue;
+      // na fatura do cartão só há gastos
+      if (type === 'cartao' && b.line.kind !== 'despesa') continue;
+      if (b.due && (b.due < from || b.due > to)) continue;
+      out.push(b);
+    }
+  return out.sort((a, b) => (a.due || `${a.mk}-32`).localeCompare(b.due || `${b.mk}-32`) || a.line.name.localeCompare(b.line.name));
+}
+
+/** Contas do plano que podem ser este lançamento (mesmo tipo, no mês dele ou perto), da mais provável para a menos. */
+export function billsFor(S, it) {
+  const cx = concContext(S);
+  const mk = U.mkOf(it.date);
+  const out = [];
+  for (const m of [mk, U.addMonths(mk, -1), U.addMonths(mk, 1)])
+    for (const b of cx.billsAt(m)) {
+      if (b.line.kind !== it.kind || (b.tx && b.tx.im)) continue;
+      if (m !== mk && !(b.due && Math.abs(U.daysBetween(it.date, b.due)) <= 10)) continue;
+      const r = scorePair(S, it, b, cx);
+      out.push({ b, s: r ? r.s : -99, d: Math.abs(it.amount - b.line.amount) });
+    }
+  return out.sort((x, y) => y.s - x.s || x.d - y.d).map((x) => x.b);
+}
+
+/** Lançamentos do extrato que podem ser esta conta, do valor mais parecido para o menos. */
+export function itemsFor(items, b) {
+  return items
+    .map((it, i) => ({ it, i }))
+    .filter(({ it }) => it.kind === b.line.kind && !it.refund && (it.status === 'add' || it.status === 'ask' || (it.link && it.match && it.match.type === 'tx')))
+    .map((x) => ({ ...x, d: Math.abs(x.it.amount - b.line.amount), dd: b.due ? Math.abs(U.daysBetween(x.it.date, b.due)) : 0 }))
+    .sort((x, y) => x.d - y.d || x.dd - y.dd);
+}
+
+/**
+ * Conciliar depois, no mês: lançamentos do extrato já importados, sem ligação com o plano, que são o pagamento
+ * de uma conta. Se a conta também estava marcada (à mão ou no automático), o pagamento entrou em dobro.
+ * Só pares bem prováveis; os que a pessoa disse que não são ficam em settings.dupSkip.
+ */
+export function doubledIn(S, mk, { unpaid = true } = {}) {
+  const skip = new Set(S.core.settings.dupSkip || []);
+  const plan = S.core.plan.filter((l) => l.type !== 'verba' && M.occurs(l, mk));
+  if (!plan.length) return [];
+  const imported = [];
+  for (const m of [U.addMonths(mk, -1), mk, U.addMonths(mk, 1)]) for (const t of M.txOf(S, m)) if (t.im && !t.p && !t.ap && t.v > 0) imported.push({ t, mk: m });
+  if (!imported.length) return [];
+  const marks = M.txOf(S, mk);
+  // primeiro um filtro barato (tipo e valor perto), para não dar nota a tudo com tudo
+  const close = (a, b) => Math.abs(a - b) <= Math.max(100, a * 0.4);
+  const todo = [];
+  for (const line of plan) {
+    const mark = marks.find((t) => t.p === line.id) || null;
+    if (mark && (mark.im || mark.ap)) continue;
+    if (!mark && !unpaid) continue;
+    const cands = imported.filter(({ t }) => t.k === line.kind && (close(t.v, line.amount) || (mark && close(t.v, mark.v))));
+    if (cands.length) todo.push({ line, mark, cands });
+  }
+  if (!todo.length) return [];
+  const cx = concContext(S);
+  const pairs = [];
+  const gid = new Map();
+  const groupOf = (c) => {
+    if (!gid.has(c)) gid.set(c, M.groupId(S, c));
+    return gid.get(c);
+  };
+  for (const { line, mark, cands } of todo) {
+    const b = { key: `${line.id}@${mk}`, line, mk, due: line.day ? `${mk}-${U.pad(Math.min(line.day, U.daysInMonth(mk)))}` : null, tx: mark };
+    const lt = cx.toksOf(line.name);
+    const seen = cx.keys.get(line.id);
+    for (const { t, mk: txMk } of cands) {
+      const key = `${b.key}|${t.id}`;
+      if (skip.has(key)) continue;
+      // só dá nota a quem tem algum sinal de ser esta conta (a nota exige isso para aparecer)
+      const maybe =
+        line.kind !== 'despesa' ||
+        line.rec === 'parcelas' ||
+        groupOf(t.c) === groupOf(line.cat) ||
+        (mark && Math.abs(t.v - mark.v) <= 1) ||
+        (seen && seen.has(merchantKey(t.n || ''))) ||
+        cx.toksOf(t.n || '').some((d) => lt.some((w) => w === d || (w.length >= 5 && d.length >= 5 && (w.startsWith(d) || d.startsWith(w)))));
+      if (!maybe) continue;
+      const it = { date: t.d, desc: t.n || '', amount: t.v, kind: t.k, cat: t.c, how: 'regra', key: merchantKey(t.n || ''), nd: norm(t.n || '') };
+      const r = scorePair(S, it, b, cx);
+      if (r && r.idn && r.s >= CONC_LINK) pairs.push({ key, line, mk, mark, tx: t, txMk, s: r.s, why: r.why });
+    }
+  }
+  // primeiro os pares mais certos; na lista, o que está em dobro de verdade vem antes
+  pairs.sort((x, y) => y.s - x.s);
+  const usedL = new Set();
+  const usedT = new Set();
+  return pairs
+    .filter((p) => {
+      if (usedL.has(p.line.id) || usedT.has(p.tx.id)) return false;
+      usedL.add(p.line.id);
+      usedT.add(p.tx.id);
+      return true;
+    })
+    .sort((x, y) => !!y.mark - !!x.mark || y.s - x.s);
 }
 
 /** Acertos aproximados no período do extrato (podem ser substituídos pelos valores reais). */

@@ -78,7 +78,24 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
   resgates de investimento e transferências entre suas contas; reconhece o que já foi importado (inclusive o mesmo
   print lido de novo, com a descrição um pouco diferente) e o que você já tinha lançado à mão.
 - **Desfazer:** logo depois de importar, o aviso traz o botão **Desfazer** (10 segundos), que apaga a importação inteira.
-- **Marca as contas do plano:** um Pix de R$ 1.500 para a imobiliária marca o “Aluguel” como pago.
+- **Conciliação com o plano** (toda importação que tiver contas do plano no período): antes das perguntas, o app
+  mostra, lado a lado, o lançamento do extrato e o item do plano que ele parece pagar, com o motivo (mesmo valor,
+  mesmo nome, mesma categoria, perto do vencimento, a parcela certa, igual da última vez). Você toca **É o mesmo** ou
+  **Não é**, e cada cartão diz o que vai acontecer:
+  - a conta ainda estava em aberto: ela fica paga, com o valor do extrato;
+  - a conta já estava marcada (por você ou no **automático**): fica só o lançamento do extrato, no lugar da marcação,
+    com o valor e a data reais (ex.: a “Luz” de R$ 150 marcada sozinha vira o débito da Energisa de R$ 187,32);
+  - você já tinha lançado à mão (mesmo valor, até 3 dias de diferença): não lança de novo.
+
+  Quando há sinal de que é a mesma coisa (nome, categoria, parcela, a mesma pessoa da última vez), o par já vem ligado;
+  quando só o valor bate (um Pix de R$ 1.200 perto do dia do aluguel), ele aparece em **Confira** e espera a sua
+  resposta. Errou o item? **Escolher outro item do plano**. E as contas do período que ficaram sem par aparecem em
+  **No plano, sem par aqui**: toque numa e escolha o lançamento do extrato que é ela. Depois de ligar uma vez, o app
+  reconhece sozinho nas próximas importações. Contas pagas adiantado (aluguel no dia 30 para o dia 5) também casam.
+- **Lançado em dobro antes?** Na aba **Mês**, o cartão *Lançado em dobro?* mostra pagamentos que entraram duas vezes
+  (a conta marcada e o mesmo pagamento vindo do extrato): **Juntar** deixa um só, com o valor do extrato
+  (**Desfazer** volta). No mês atual e no anterior, ele também mostra lançamentos do extrato que pagam uma conta ainda
+  em aberto (**É esta conta**).
 - **Troca os acertos aproximados** daquele período pelos valores reais (você escolhe).
 - Estornos da fatura abatem o gasto da categoria.
 - **Confere sozinho:** quando a fatura traz o total (ex.: “Total dos lançamentos atuais” no Itaú), o app compara com a
@@ -206,8 +223,8 @@ codigo/src/
     sheets.js   lançamento rápido, acerto, check-in, editor do plano, ajustes, assistente
     actions.js  operações (lançar, marcar conta, check-in, importar, automático) e exportações
     model.js    plano, projeção, previsto x realizado, categorias em 2 níveis, busca e sugestão
-    importer.js leitura de OFX/CSV/PDF/texto, categorização, palpites, duplicados e contas do plano
-    importui.js telas da importação (perguntas, palpites e revisão)
+    importer.js leitura de OFX/CSV/PDF/texto, categorização, palpites, duplicados e conciliação com o plano
+    importui.js telas da importação (conciliação, perguntas, palpites e revisão)
     ocr.js      leitura de prints no aparelho (Tesseract.js: prepara a imagem, lê palavras e cores)
     screen.js   transforma as palavras do print em lançamentos (linhas, itens, datas, entrada ou saída)
     merchants.js lojas e serviços conhecidos → categoria

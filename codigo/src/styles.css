@@ -3284,6 +3284,189 @@ details.tech code {
   font-size: 11.5px;
 }
 
+/* ---------- conciliação com o plano (importação) ---------- */
+.conc-sum {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--lime) 16%, var(--card));
+  border: 1px solid color-mix(in oklab, var(--lime) 50%, var(--line-2));
+}
+.conc-sum .imp-ic {
+  width: 38px;
+  height: 38px;
+  font-size: 19px;
+  background: var(--card);
+}
+.conc-sum h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+.conc-sum p {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.conc-sum p b {
+  color: var(--ink);
+}
+.cc-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.cc {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  border-radius: 18px;
+  border: 1px solid var(--line-2);
+  background: var(--card);
+  scroll-margin: 90px;
+}
+.cc.on {
+  border-color: color-mix(in oklab, var(--lime) 75%, var(--line-2));
+  background: color-mix(in oklab, var(--lime) 9%, var(--card));
+}
+.cc.und {
+  border-style: dashed;
+}
+.cc.nudge {
+  outline: 2px solid var(--crit);
+  outline-offset: 2px;
+}
+.cc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.cc-tag {
+  flex: none;
+  min-width: 56px;
+  padding-top: 3px;
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cc-txt {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.cc-txt b {
+  font-weight: 620;
+  font-size: 14.5px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cc-txt small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.cc-amt {
+  flex: none;
+  padding-top: 1px;
+  font-weight: 650;
+  font-size: 14.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cc-amt.k-receita {
+  color: var(--good-text);
+}
+.cc-why {
+  margin: -2px 0 0 66px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.cc-seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 40px;
+}
+.cc-seg button[data-on='1'].on {
+  background: var(--lime);
+  color: var(--on-lime);
+}
+.cc-seg .ic {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.6;
+}
+.cc-seg button:not(.on) .ic {
+  display: none;
+}
+.cc-out {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.cc-out.warn {
+  color: var(--crit-text);
+  font-weight: 620;
+}
+.cc .link.small {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0;
+  font-size: 13px;
+}
+.txs .tx.cur {
+  font-weight: 650;
+}
+.txs .tx.cur .tx-amt .ic {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  vertical-align: -3px;
+  stroke-width: 2.6;
+}
+
+.imp .conc-btns .btn.ghost {
+  flex: 0 1 34%;
+}
+.imp .conc-btns .btn.lime {
+  flex: 1 1 60%;
+  white-space: nowrap;
+}
+/* conciliar depois (aba Mês) */
+.dbl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.dbl {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.dbl:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+.dbl .row-btns {
+  margin-top: 2px;
+}
+.dbl .btn.small {
+  min-height: 40px;
+}
+
 /* ---------- criar subcategoria ---------- */
 .mnew {
   display: grid;
