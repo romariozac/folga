@@ -196,6 +196,12 @@ O build gera `codigo/dist/` com o `index.html` (CSS, JS e a fonte Bricolage Grot
 feita no `worker.min.js` em `vendor/ocr/OCR-LICENSE.txt`), `sw.js` (offline), `manifest.webmanifest` (instalação e
 atalhos) e os ícones. Para publicar uma nova versão, copie o conteúdo de `codigo/dist/` para a raiz do repositório.
 
+Os testes da categorização da importação ficam em `codigo/test/` (só o Node, sem dependências):
+
+```bash
+cd codigo && npm test
+```
+
 ```
 codigo/src/
   index.html, styles.css, sw.js, manifest.webmanifest, icons/, fonts/
