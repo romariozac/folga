@@ -567,6 +567,50 @@ export function skipAuto(lineId, mk) {
   store.save(['core']);
 }
 
+// ---------- conciliar depois (no mês) ----------
+/**
+ * O lançamento do extrato vira o pagamento da conta do plano (no mês da conta, com a categoria dela); a marcação
+ * que havia (à mão ou automática) sai. Devolve o que é preciso para desfazer.
+ */
+export function settleDouble({ mk, lineId, markId = null, txMk, txId }) {
+  const st = S();
+  const line = lineById(lineId);
+  const keys = new Set(['m-' + mk, 'm-' + txMk]);
+  const take = (m, id) => {
+    const b = st.months[m];
+    const t = b && b.tx.find((x) => x.id === id);
+    if (t) b.tx = b.tx.filter((x) => x !== t);
+    return t || null;
+  };
+  const tx = take(txMk, txId);
+  if (!tx || !line) {
+    if (tx) st.months[txMk].tx.push(tx);
+    return null;
+  }
+  const mark = markId ? take(mk, markId) : null;
+  (st.months[mk] ||= { updatedAt: 0, tx: [] }).tx.push({ ...tx, p: line.id, c: line.cat });
+  store.save([...keys]);
+  return { mk, txMk, tx, mark };
+}
+
+export function unsettleDouble(u) {
+  const st = S();
+  const b = st.months[u.mk];
+  if (b) b.tx = b.tx.filter((x) => x.id !== u.tx.id);
+  if (u.mark) (st.months[u.mk] ||= { updatedAt: 0, tx: [] }).tx.push(u.mark);
+  (st.months[u.txMk] ||= { updatedAt: 0, tx: [] }).tx.push(u.tx);
+  store.save(['m-' + u.mk, 'm-' + u.txMk]);
+}
+
+/** “Não é”: o par não aparece de novo (e desfazer devolve). */
+export function skipDouble(key, on = true) {
+  const s = S().core.settings;
+  const list = (s.dupSkip || []).filter((k) => k !== key);
+  if (on) list.push(key);
+  s.dupSkip = list.slice(-300);
+  store.save(['core']);
+}
+
 // ---------- importação ----------
 export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) {
   const st = S();
@@ -589,20 +633,40 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
   let count = 0;
   let out = 0;
   let inn = 0;
+  let linked = 0;
+  let replaced = 0;
+  const skips = [];
   const investMonths = new Set();
   for (const it of items) {
     if (it.status !== 'add' || !it.cat) continue;
     const mk = it.p ? it.billMk : U.mkOf(it.date);
+    if (it.p) {
+      linked++;
+      // conciliação: a conta já estava marcada (à mão ou no automático) e o lançamento do extrato fica no lugar
+      // da marcação, com o valor e a data reais (desfazer a importação devolve a marcação)
+      const r = it.replaces;
+      const b = r && st.months[r.mk];
+      const old = b && b.tx.find((t) => t.id === r.id);
+      if (old) {
+        b.tx = b.tx.filter((t) => t !== old);
+        removed.push({ mk: r.mk, t: old });
+        keys.add('m-' + r.mk);
+        replaced++;
+      }
+    }
     const t = { id: U.uid() + count, d: it.date, v: it.refund ? -it.amount : it.amount, k: it.kind, c: it.cat, n: it.desc, im: 1, fp: it.fp, t: Date.now() + count };
     if (it.p) t.p = it.p;
     (st.months[mk] ||= { updatedAt: 0, tx: [] }).tx.push(t);
     added.push({ mk, id: t.id });
+    // “Não é” na conciliação: o cartão do mês não sugere de novo este par
+    if (it.match && it.match.type === 'bill' && !it.link && it.decided) skips.push(`${it.match.key}|${t.id}`);
     keys.add('m-' + mk);
     count++;
     if (it.kind === 'receita') inn += it.amount;
     else if (it.kind === 'despesa') out += it.refund ? -it.amount : it.amount;
     if (it.kind === 'invest') investMonths.add(mk);
   }
+  if (skips.length) st.core.settings.dupSkip = [...(st.core.settings.dupSkip || []), ...skips].slice(-300);
   for (const r of learn) {
     prevRules.push([r.key, st.core.rules[r.key]]);
     st.core.rules[r.key] = r.cat;
@@ -625,7 +689,7 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
     for (const k of keys) if (k.startsWith('m-')) checkAllBills(k.slice(2), events);
   }
   store.save([...keys]);
-  return { events, count, out, inn, undo: { added, removed, prevRules, xp: g.xp - xp0, count } };
+  return { events, count, out, inn, linked, replaced, undo: { added, removed, prevRules, xp: g.xp - xp0, count } };
 }
 
 /** Desfaz uma importação: tira os lançamentos que ela criou, devolve os acertos trocados e as regras e o XP. */

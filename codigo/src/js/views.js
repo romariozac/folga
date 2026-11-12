@@ -3,6 +3,7 @@ import { ctx, today, curMk } from './ctx.js';
 import * as U from './util.js';
 import * as M from './model.js';
 import * as G from './game.js';
+import * as IM from './importer.js';
 import { IC, $$ } from './ui.js';
 import { projectionSVG } from './charts.js';
 
@@ -248,6 +249,59 @@ function txsByFlowHTML(txs, mk) {
   }).join('');
 }
 
+// a aba Mês redesenha a cada toque: só recalcula quando os lançamentos (do mês e vizinhos) ou o plano mudam
+let dblMemo = { sig: '', list: [] };
+function doubledCached(st, mk, unpaid) {
+  const txSig = (m) => {
+    const t = M.txOf(st, m);
+    return `${m}:${t.length}:${U.sum(t, (x) => x.v)}:${U.sum(t, (x) => (x.p ? 1 : 0) + (x.c || '').length + (x.n || '').length)}`;
+  };
+  const sig = [
+    mk,
+    unpaid,
+    st.core.plan.map((l) => `${l.id}:${l.amount}:${l.day || ''}:${l.cat}:${l.type}:${l.rec}:${l.start}:${l.end || ''}:${l.count || ''}`).join(','),
+    (st.core.settings.dupSkip || []).length + ':' + (st.core.settings.dupSkip || []).slice(-1),
+    ...[U.addMonths(mk, -1), mk, U.addMonths(mk, 1)].map(txSig),
+  ].join('|');
+  if (dblMemo.sig !== sig) dblMemo = { sig, list: IM.doubledIn(st, mk, { unpaid }) };
+  return dblMemo.list;
+}
+
+/**
+ * Mês: conciliar depois. Pagamentos que entraram em dobro (a conta estava marcada e o extrato trouxe o mesmo
+ * pagamento) e, no mês atual e no anterior, lançamentos do extrato que pagam uma conta ainda em aberto.
+ */
+function doubleHTML(st, mk, cm) {
+  if (mk > cm) return '';
+  const list = doubledCached(st, mk, mk >= U.addMonths(cm, -1));
+  if (!list.length) return '';
+  const dbl = list.some((d) => d.mark);
+  const open = { despesa: 'a pagar', receita: 'a receber', invest: 'a guardar' };
+  const rows = list
+    .map((d) => {
+      const c = M.catById(st, d.line.cat);
+      const mark = d.mark ? `${d.mark.auto ? 'marcada sozinha' : 'marcada por você'} · ${U.dayLabel(d.mark.d).toLowerCase()}` : `ainda ${open[d.line.kind]}`;
+      const data = `data-mk="${mk}" data-line="${d.line.id}" data-mark="${d.mark ? d.mark.id : ''}" data-txmk="${d.txMk}" data-tx="${d.tx.id}" data-key="${esc(d.key)}"`;
+      return `<li class="dbl">
+        <div class="cc-row"><span class="cc-tag">Plano</span><span class="cc-txt"><b>${c.emoji} ${esc(d.line.name)}</b><small>${mark}</small></span><span class="cc-amt">${money(d.mark ? d.mark.v : d.line.amount)}</span></div>
+        <div class="cc-row"><span class="cc-tag">Extrato</span><span class="cc-txt"><b>${esc(d.tx.n || '')}</b><small>${U.dayLabel(d.tx.d)}</small></span><span class="cc-amt">${money(d.tx.v)}</span></div>
+        <div class="row-btns"><button class="btn small lime" data-act="dbl-join" ${data}>${IC.check}${d.mark ? 'Juntar' : 'É esta conta'}</button><button class="btn small ghost" data-act="dbl-skip" ${data}>Não é</button></div>
+      </li>`;
+    })
+    .join('');
+  return `<section class="card dbl-card ${reveal()}">
+    <div class="card-head"><h2>${dbl ? 'Lançado em dobro?' : 'Conciliar com o plano'}</h2><span class="pill">${list.length}</span></div>
+    <p class="card-sub">${
+      !dbl
+        ? 'Estes lançamentos do extrato parecem pagar contas do plano que ainda estão em aberto.'
+        : list.every((d) => d.mark)
+          ? 'O extrato trouxe pagamentos que já estavam marcados no plano. Junte para contar uma vez só, com o valor do extrato.'
+          : 'O extrato trouxe pagamentos que já estavam marcados no plano (junte para contar uma vez só) ou que pagam contas ainda em aberto.'
+    }</p>
+    <ul class="dbl-list">${rows}</ul>
+  </section>`;
+}
+
 export function monthHTML() {
   rv = 0;
   const st = S();
@@ -314,6 +368,7 @@ export function monthHTML() {
       <div><p class="eyebrow">${isCur ? 'Este mês' : mk > cm ? 'Mês futuro · só previsto' : 'Mês passado'}</p><h1>${U.monthLabel(mk)}</h1></div>
       <button class="icon-btn" data-act="mk-next" aria-label="Próximo mês">${IC.right}</button>
     </section>
+    ${doubleHTML(st, mk, cm)}
     <section class="card ${reveal()}">
       <table class="pr-table">
         <thead><tr><th></th><th>Previsto</th><th>Realizado</th></tr></thead>

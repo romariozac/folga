@@ -146,6 +146,7 @@ export function defaultCore() {
       createdAt: isoDate(),
       favs: [...DEFAULT_FAVS],
       planSkip: [], // “Conferir o plano”: sugestões que a pessoa disse que não tem (ids de PLAN_CHECKS)
+      dupSkip: [], // conciliar no mês: pares (conta do plano | lançamento do extrato) que a pessoa disse que não são
     },
     cats: DEFAULT_CATS.map((c) => ({ ...c })),
     plan: [],

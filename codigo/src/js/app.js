@@ -224,6 +224,38 @@ document.addEventListener('click', (e) => {
       A.skipCheck(d.id, false);
       render();
       break;
+    case 'dbl-join': {
+      // conciliar depois: o lançamento do extrato vira o pagamento da conta; a marcação que havia sai
+      const u = A.settleDouble({ mk: d.mk, lineId: d.line, markId: d.mark || null, txMk: d.txmk, txId: d.tx });
+      if (!u) break;
+      render();
+      const line = A.lineById(d.line);
+      toast(u.mark ? `Juntado: “${U.esc(line.name)}” fica com ${U.money(u.tx.v)}, o valor do extrato.` : `“${U.esc(line.name)}” paga com o lançamento do extrato.`, {
+        action: {
+          label: 'Desfazer',
+          fn: () => {
+            A.unsettleDouble(u);
+            render();
+          },
+        },
+      });
+      break;
+    }
+    case 'dbl-skip': {
+      const key = d.key;
+      A.skipDouble(key);
+      render();
+      toast('Ok, ficam separados.', {
+        action: {
+          label: 'Desfazer',
+          fn: () => {
+            A.skipDouble(key, false);
+            render();
+          },
+        },
+      });
+      break;
+    }
     case 'carry-edit':
       SH.openCarry(d.mk);
       break;
