@@ -97,6 +97,12 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
 - **Conciliar na pergunta:** nas perguntas (“Em que categoria entra?”, “Que dinheiro é esse?”), o bloco **É de um item
   do plano?** mostra os itens do plano ainda sem par mais parecidos com o lançamento; um toque concilia, e **Outro item
   do plano** abre a lista inteira. Assim nada passa batido.
+- **Pagou só parte?** Ao marcar uma conta com valor menor que o previsto (na tela *Quanto pagou?* ou na conciliação),
+  aparece **Passar o resto (R$ …) para o mês seguinte**. Marcado, o resto vira um item “só em” do mês seguinte
+  (ex.: *Fatura de cartão · resto de nov*): entra nas contas a pagar e na sobra prevista de lá. Mudar o valor pago
+  acerta o resto; pagar tudo, desmarcar ou excluir o pagamento tira o resto junto (com **Desfazer**). Se a conta só
+  veio menor (luz, água), deixe desmarcado. Na fatura do cartão, o app lembra que no banco o resto entra no rotativo,
+  com juros.
 - **Lançado em dobro antes?** Na aba **Mês**, o cartão *Lançado em dobro?* mostra pagamentos que entraram duas vezes
   (a conta marcada e o mesmo pagamento vindo do extrato): **Juntar** deixa um só, com o valor do extrato
   (**Desfazer** volta). No mês atual e no anterior, ele também mostra lançamentos do extrato que pagam uma conta ainda

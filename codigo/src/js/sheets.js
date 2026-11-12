@@ -278,12 +278,14 @@ export function openTxEdit(mk, id) {
             const ok = await confirmDialog({ title: 'Excluir lançamento?', text: `${esc(t.n || M.catById(S(), t.c).name)} · ${money(t.v)}`, ok: 'Excluir', danger: true });
             if (!ok) return;
             const removed = A.removeTx(mk, id);
+            const rest = A.dropRest(removed);
             close();
             rerender();
-            toast('Lançamento excluído.', {
+            toast(`Lançamento excluído.${rest ? ` O resto que tinha ido para ${U.monthName(rest.start)} saiu também.` : ''}`, {
               action: {
                 label: 'Desfazer',
                 fn: () => {
+                  A.restoreRest(rest);
                   (S().months[mk] ||= { updatedAt: 0, tx: [] }).tx.push(removed);
                   store.save(['m-' + mk]);
                   rerender();
@@ -297,6 +299,9 @@ export function openTxEdit(mk, id) {
           const v = U.parseMoney(form.elements.v.value);
           if (v <= 0) return form.elements.v.focus();
           A.updateTx(mk, id, { v, n: form.elements.n.value.trim(), d: form.elements.d.value || t.d, c: cat });
+          // pagamento com resto no mês seguinte: o resto acompanha o valor novo (some se pagou tudo)
+          const nt = A.findTx(mk, id);
+          if (nt && nt.carry && line) A.setRest(line, mk, nt, true);
           close();
           rerender();
           toast('Lançamento atualizado.');
@@ -328,12 +333,14 @@ export function unpayBill(lineId, mk) {
   const b = c.bills.find((x) => x.line.id === lineId);
   if (!b || !b.tx) return;
   const removed = A.removeTx(mk, b.tx.id);
+  const rest = A.dropRest(removed);
   if (b.line.auto) A.skipAuto(b.line.id, mk);
   rerender();
-  toast(`${esc(b.line.name)} desmarcado.`, {
+  toast(`${esc(b.line.name)} desmarcado.${rest ? ` O resto que tinha ido para ${U.monthName(rest.start)} saiu também.` : ''}`, {
     action: {
       label: 'Desfazer',
       fn: () => {
+        A.restoreRest(rest);
         (S().months[mk] ||= { updatedAt: 0, tx: [] }).tx.push(removed);
         delete S().core.autoSkip[`${b.line.id}@${mk}`];
         store.save(['core', 'm-' + mk]);
@@ -351,10 +358,19 @@ export function openBill(lineId, mk) {
   const tx = b && b.tx;
   const verb = line.kind === 'receita' ? 'Recebi' : line.kind === 'invest' ? 'Guardei' : 'Paguei';
   const q = line.kind === 'receita' ? 'Quanto entrou?' : line.kind === 'invest' ? 'Quanto guardou?' : 'Quanto pagou?';
+  // pagou menos que o previsto: o resto pode ir para o mês seguinte (vira um item “só em” lá)
+  const mes = U.monthName(U.addMonths(mk, 1));
+  const restLabel = (v) => (line.kind === 'receita' ? `Receber o resto (${money(line.amount - v)}) em ${mes}` : `Passar o resto (${money(line.amount - v)}) para ${mes}`);
+  const restHelp =
+    line.kind === 'receita'
+      ? 'Marque se o resto ainda vai entrar. Se veio menor mesmo, deixe desmarcado.'
+      : `Marque se ficou faltando pagar (por exemplo, só parte da fatura). Se a conta veio menor, deixe desmarcado.${M.isCardBill(line) ? ' No banco, o que fica da fatura entra no rotativo, com juros: a próxima vem maior.' : ''}`;
+  const v0 = tx ? tx.v : line.amount;
   openSheet(
     `${sheetHead(esc(line.name), `${M.recText(line)} · ${U.monthLabel(mk)}`)}
     <form class="form">
-      <label class="field"><span>${q}</span><div class="money-in"><span>R$</span><input name="v" inputmode="decimal" value="${U.moneyInput(tx ? tx.v : line.amount)}" required></div><small class="help">Previsto: ${money(line.amount)}</small></label>
+      <label class="field"><span>${q}</span><div class="money-in"><span>R$</span><input name="v" inputmode="decimal" value="${U.moneyInput(v0)}" required></div><small class="help">Previsto: ${money(line.amount)}</small></label>
+      <label class="tog rest-tog" data-rest-wrap ${A.canRest(line, v0) ? '' : 'hidden'}><input type="checkbox" name="rest" ${tx && tx.carry ? 'checked' : ''}><span><span data-rest-txt>${restLabel(v0)}</span><small class="help">${restHelp}</small></span></label>
       <label class="field"><span>Quando</span><input type="date" name="d" value="${tx ? tx.d : mk === curMk() ? today() : `${mk}-${U.pad(Math.min(line.day || 1, U.daysInMonth(mk)))}`}"></label>
       <label class="tog"><input type="checkbox" data-auto ${line.auto ? 'checked' : ''}><span>${AUTO_LABEL[line.kind]}</span></label>
       <div class="row-btns">${tx ? '<button type="button" class="btn ghost" data-unpay>Desmarcar</button>' : ''}<button class="btn primary" type="submit">${tx ? 'Salvar' : verb}</button></div>
@@ -363,21 +379,33 @@ export function openBill(lineId, mk) {
     {
       onMount: (el, close) => {
         const form = $('form', el);
+        // a opção do resto aparece só quando o valor fica abaixo do previsto
+        form.elements.v.addEventListener('input', () => {
+          const v = U.parseMoney(form.elements.v.value);
+          const wrap = $('[data-rest-wrap]', el);
+          wrap.hidden = !A.canRest(line, v);
+          if (!wrap.hidden) $('[data-rest-txt]', el).textContent = restLabel(v);
+        });
         form.addEventListener('submit', (e) => {
           e.preventDefault();
           const v = U.parseMoney(form.elements.v.value);
           if (v <= 0) return form.elements.v.focus();
           const d = form.elements.d.value || today();
+          const wantRest = form.elements.rest.checked && A.canRest(line, v);
+          const restMsg = (l2) => (l2 ? `<br><small>O resto (${money(l2.amount)}) foi para ${mes}.</small>` : '');
           if (tx) {
             A.updateTx(mk, tx.id, { v, d });
+            const t = A.findTx(mk, tx.id);
+            const l2 = t && (wantRest || t.carry) ? A.setRest(line, mk, t, wantRest) : null;
             close();
             rerender();
-            toast('Atualizado.');
+            toast(`Atualizado.${restMsg(l2)}`);
           } else {
             const res = A.payBill(line, mk, v, d);
+            const l2 = wantRest ? A.setRest(line, mk, res.t, true) : null;
             close();
             rerender();
-            A.notify(`${esc(line.name)} · <b>${m0(v)}</b>`, res.events);
+            A.notify(`${esc(line.name)} · <b>${m0(v)}</b>${restMsg(l2)}`, res.events);
           }
         });
         el.addEventListener('change', (e) => {

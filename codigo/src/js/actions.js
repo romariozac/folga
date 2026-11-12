@@ -567,6 +567,49 @@ export function skipAuto(lineId, mk) {
   store.save(['core']);
 }
 
+// ---------- o resto de uma conta paga em parte ----------
+// Pagou só parte (ex.: metade da fatura): o resto vira um item “só em” do mês seguinte, ligado ao pagamento
+// (tx.carry = id do item; item.rest = de onde veio). Mudar ou tirar o pagamento muda ou tira o resto junto.
+const restName = (line, mk) => `${line.name.replace(/ · resto de [a-zç]{3}$/, '')} · resto de ${U.monthShort(mk)}`;
+/** O item do plano com o resto deste pagamento (ou null). */
+export const restLine = (tx) => (tx && tx.carry ? S().core.plan.find((l) => l.id === tx.carry) || null : null);
+/** Dá para mandar o resto para o mês seguinte: gasto ou receita (não metas) pago abaixo do previsto (R$ 1 ou mais). */
+export const canRest = (line, v) => !!line && line.kind !== 'invest' && !line.goal && line.amount - v >= 100;
+
+/** Liga (on) ou desliga o resto deste pagamento. Devolve o item do mês seguinte (ou null). */
+export function setRest(line, mk, tx, on) {
+  const st = S();
+  let l2 = restLine(tx);
+  if (!on || !canRest(line, tx.v)) {
+    if (l2) st.core.plan = st.core.plan.filter((l) => l !== l2);
+    delete tx.carry;
+    l2 = null;
+  } else if (l2) l2.amount = line.amount - tx.v;
+  else {
+    l2 = { id: U.uid(), name: restName(line, mk), kind: line.kind, cat: line.cat, amount: line.amount - tx.v, type: 'conta', rec: 'unico', start: U.addMonths(mk, 1), rest: { line: line.id, mk } };
+    if (line.day) l2.day = line.day;
+    st.core.plan.push(l2);
+    tx.carry = l2.id;
+  }
+  store.save(['core', 'm-' + mk]);
+  return l2;
+}
+
+/** Tirou o pagamento: o resto que ele mandou para o mês seguinte sai junto (devolve o item, para desfazer). */
+export function dropRest(tx) {
+  const l2 = restLine(tx);
+  if (!l2) return null;
+  S().core.plan = S().core.plan.filter((l) => l !== l2);
+  store.save(['core']);
+  return l2;
+}
+
+export function restoreRest(l2) {
+  if (!l2 || S().core.plan.some((l) => l.id === l2.id)) return;
+  S().core.plan.push(l2);
+  store.save(['core']);
+}
+
 // ---------- conciliar depois (no mês) ----------
 /**
  * O lançamento do extrato vira o pagamento da conta do plano (no mês da conta, com a categoria dela); a marcação
@@ -588,15 +631,31 @@ export function settleDouble({ mk, lineId, markId = null, txMk, txId }) {
     return null;
   }
   const mark = markId ? take(mk, markId) : null;
-  (st.months[mk] ||= { updatedAt: 0, tx: [] }).tx.push({ ...tx, p: line.id, c: line.cat });
+  const linked = { ...tx, p: line.id, c: line.cat };
+  (st.months[mk] ||= { updatedAt: 0, tx: [] }).tx.push(linked);
+  // a marcação tinha mandado um resto para o mês seguinte: ele continua, agora com o valor do extrato
+  let rest = null;
+  if (mark && mark.carry) {
+    linked.carry = mark.carry;
+    const l2 = restLine(linked);
+    if (l2) {
+      rest = { line: l2, amount: l2.amount };
+      setRest(line, mk, linked, true);
+    }
+  }
   store.save([...keys]);
-  return { mk, txMk, tx, mark };
+  return { mk, txMk, tx, mark, rest };
 }
 
 export function unsettleDouble(u) {
   const st = S();
   const b = st.months[u.mk];
   if (b) b.tx = b.tx.filter((x) => x.id !== u.tx.id);
+  if (u.rest) {
+    u.rest.line.amount = u.rest.amount;
+    restoreRest(u.rest.line);
+    store.save(['core']);
+  }
   if (u.mark) (st.months[u.mk] ||= { updatedAt: 0, tx: [] }).tx.push(u.mark);
   (st.months[u.txMk] ||= { updatedAt: 0, tx: [] }).tx.push(u.tx);
   store.save(['m-' + u.mk, 'm-' + u.txMk]);
@@ -636,6 +695,7 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
   let linked = 0;
   let replaced = 0;
   const skips = [];
+  let planBefore = null; // o plano antes de mexer em restos (para desfazer)
   const investMonths = new Set();
   for (const it of items) {
     if (it.status !== 'add' || !it.cat) continue;
@@ -652,6 +712,7 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
         removed.push({ mk: r.mk, t: old });
         keys.add('m-' + r.mk);
         replaced++;
+        if (old.carry) it.oldCarry = old.carry;
       }
     }
     const t = { id: U.uid() + count, d: it.date, v: it.refund ? -it.amount : it.amount, k: it.kind, c: it.cat, n: it.desc, im: 1, fp: it.fp, t: Date.now() + count };
@@ -660,6 +721,16 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
     added.push({ mk, id: t.id });
     // “Não é” na conciliação: o cartão do mês não sugere de novo este par
     if (it.match && it.match.type === 'bill' && !it.link && it.decided) skips.push(`${it.match.key}|${t.id}`);
+    // pagou só parte: o resto vai para o mês seguinte (ou continua lá, se a marcação substituída já tinha mandado)
+    if (it.p && (it.carry || it.oldCarry)) {
+      const line = lineById(it.p);
+      if (line) {
+        if (planBefore === null) planBefore = JSON.stringify(st.core.plan);
+        if (it.oldCarry) t.carry = it.oldCarry;
+        setRest(line, mk, t, !!it.carry);
+      }
+    }
+    delete it.oldCarry;
     keys.add('m-' + mk);
     count++;
     if (it.kind === 'receita') inn += it.amount;
@@ -689,7 +760,7 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
     for (const k of keys) if (k.startsWith('m-')) checkAllBills(k.slice(2), events);
   }
   store.save([...keys]);
-  return { events, count, out, inn, linked, replaced, undo: { added, removed, prevRules, xp: g.xp - xp0, count } };
+  return { events, count, out, inn, linked, replaced, undo: { added, removed, prevRules, xp: g.xp - xp0, count, plan: planBefore } };
 }
 
 /** Desfaz uma importação: tira os lançamentos que ela criou, devolve os acertos trocados e as regras e o XP. */
@@ -711,6 +782,7 @@ export function undoImport(res) {
     if (v === undefined) delete st.core.rules[k];
     else st.core.rules[k] = v;
   }
+  if (u.plan) st.core.plan = JSON.parse(u.plan);
   const g = st.core.game;
   g.xp = Math.max(0, g.xp - u.xp);
   g.totalTx = Math.max(0, (g.totalTx || 0) - u.count);

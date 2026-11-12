@@ -889,12 +889,13 @@ export function setLink(it, on) {
   if (on) {
     it.pre = { status: it.status, cat: it.cat, how: it.how, reason: it.reason };
     const m = it.match;
-    if (m.type === 'bill') Object.assign(it, { status: 'add', cat: m.line.cat, how: 'plano', p: m.line.id, billName: m.line.name, billMk: m.mk, replaces: m.tx ? { mk: m.mk, id: m.tx.id } : null });
+    // carry: mandar o resto (pagou menos que o previsto) para o mês seguinte; vem marcado se a marcação já mandava
+    if (m.type === 'bill') Object.assign(it, { status: 'add', cat: m.line.cat, how: 'plano', p: m.line.id, billName: m.line.name, billMk: m.mk, replaces: m.tx ? { mk: m.mk, id: m.tx.id } : null, carry: !!(m.tx && m.tx.carry) });
     else Object.assign(it, { status: 'dup', reason: `Você já lançou: ${m.name} em ${U.dayLabel(m.tx.d).toLowerCase()}`, dupOf: m.tx.id });
     it.link = true;
   } else {
     Object.assign(it, it.pre);
-    for (const k of ['p', 'billName', 'billMk', 'replaces', 'dupOf']) delete it[k];
+    for (const k of ['p', 'billName', 'billMk', 'replaces', 'dupOf', 'carry']) delete it[k];
     it.link = false;
   }
 }
@@ -951,7 +952,7 @@ export function billsFor(S, it) {
  * pagamento da fatura que a importação ignorou também pode ser ela.
  */
 export function itemsFor(items, b) {
-  const card = b.line.kind === 'despesa' && (b.line.cat === 'cartao' || /\b(fatura|cartao)\b/.test(norm(b.line.name)));
+  const card = M.isCardBill(b.line);
   const open = (it) => it.status === 'add' || it.status === 'ask' || (card && it.status === 'ignore' && /^Pagamento da fatura/.test(it.reason || ''));
   return items
     .map((it, i) => ({ it, i }))
