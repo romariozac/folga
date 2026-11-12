@@ -411,6 +411,9 @@ export function parcelaOf(l, mk) {
 
 export const txOf = (S, mk) => (S.months[mk] && S.months[mk].tx) || [];
 
+/** Item do plano que é a fatura do cartão (o que não se paga dela vira rotativo no banco). */
+export const isCardBill = (l) => l.kind === 'despesa' && (l.cat === 'cartao' || /\b(fatura|cartao)\b/.test(norm(l.name)));
+
 /** Previsto x realizado de um mês (por grupo em byCat; por item em bySub). */
 export function monthCalc(S, mk) {
   const lines = S.core.plan.filter((l) => occurs(l, mk));

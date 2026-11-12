@@ -290,8 +290,19 @@ export function openImport() {
             <button type="button" data-link="${i}" data-on="0" class="${!on && !und ? 'on' : ''}" aria-pressed="${!on && !und}">Não é</button>
           </div>
           <p class="cc-out${warn ? ' warn' : ''}">${out}</p>
+          ${on && m.type === 'bill' ? restHTML(it, i) : ''}
           ${m.type === 'bill' && !on ? `<button type="button" class="link small" data-other="${i}">Escolher outro item do plano</button>` : ''}
         </li>`;
+      };
+
+      /** Pagou menos que o previsto: opção de mandar o resto para o mês seguinte (fica marcada se já mandava). */
+      const restHTML = (it, i) => {
+        const line = it.match.line;
+        if (!A.canRest(line, it.amount)) return '';
+        const mes = U.monthName(U.addMonths(it.match.mk, 1));
+        const label = line.kind === 'receita' ? `Receber o resto (${money(line.amount - it.amount)}) em ${mes}` : `Passar o resto (${money(line.amount - it.amount)}) para ${mes}`;
+        const card = it.carry && M.isCardBill(line) ? `<small class="help">No banco, o que fica da fatura entra no rotativo, com juros: a próxima vem maior.</small>` : '';
+        return `<label class="tog inline cc-rest"><input type="checkbox" data-rest="${i}" ${it.carry ? 'checked' : ''}><span>${label}${card}</span></label>`;
       };
 
       const looseRowHTML = (b) => {
@@ -600,6 +611,10 @@ export function openImport() {
           }, 'Preparando o leitor de prints…');
         }
         if (e.target.matches('[data-learn]')) st.learnOn = e.target.checked;
+        if (e.target.matches('[data-rest]')) {
+          st.items[+e.target.dataset.rest].carry = e.target.checked;
+          draw(true);
+        }
         if (e.target.matches('[data-replace]')) st.replace = e.target.checked;
       });
       el.addEventListener('input', (e) => {

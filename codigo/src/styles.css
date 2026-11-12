@@ -3466,6 +3466,32 @@ details.tech code {
   padding: 0;
   font-size: 13px;
 }
+/* pagou só parte: o resto vai para o mês seguinte */
+.rest-tog,
+.cc-rest {
+  align-items: flex-start;
+}
+.rest-tog input,
+.cc-rest input {
+  margin-top: 2px;
+}
+.rest-tog > span,
+.cc-rest > span {
+  display: grid;
+  gap: 3px;
+}
+.rest-tog small.help,
+.cc-rest small.help {
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.cc-rest {
+  font-size: 14px;
+  font-weight: 600;
+}
+.cc-rest small.help {
+  font-weight: 500;
+}
 /* conciliar depois (aba Mês) */
 .dbl-list {
   list-style: none;
