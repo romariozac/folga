@@ -945,11 +945,17 @@ export function billsFor(S, it) {
   return out.sort((x, y) => y.s - x.s || x.d - y.d).map((x) => x.b);
 }
 
-/** Lançamentos do extrato que podem ser esta conta, do valor mais parecido para o menos. */
+/**
+ * Lançamentos do extrato ainda sem par que podem ser esta conta, do valor mais parecido para o menos. Os já ligados
+ * (a outra conta do plano ou ao que você lançou à mão) ficam de fora. Se a conta do plano é a fatura do cartão, o
+ * pagamento da fatura que a importação ignorou também pode ser ela.
+ */
 export function itemsFor(items, b) {
+  const card = b.line.kind === 'despesa' && (b.line.cat === 'cartao' || /\b(fatura|cartao)\b/.test(norm(b.line.name)));
+  const open = (it) => it.status === 'add' || it.status === 'ask' || (card && it.status === 'ignore' && /^Pagamento da fatura/.test(it.reason || ''));
   return items
     .map((it, i) => ({ it, i }))
-    .filter(({ it }) => it.kind === b.line.kind && !it.refund && (it.status === 'add' || it.status === 'ask' || (it.link && it.match && it.match.type === 'tx')))
+    .filter(({ it }) => it.kind === b.line.kind && !it.refund && !it.link && open(it))
     .map((x) => ({ ...x, d: Math.abs(x.it.amount - b.line.amount), dd: b.due ? Math.abs(U.daysBetween(x.it.date, b.due)) : 0 }))
     .sort((x, y) => x.d - y.d || x.dd - y.dd);
 }

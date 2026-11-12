@@ -90,8 +90,13 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
   Quando há sinal de que é a mesma coisa (nome, categoria, parcela, a mesma pessoa da última vez), o par já vem ligado;
   quando só o valor bate (um Pix de R$ 1.200 perto do dia do aluguel), ele aparece em **Confira** e espera a sua
   resposta. Errou o item? **Escolher outro item do plano**. E as contas do período que ficaram sem par aparecem em
-  **No plano, sem par aqui**: toque numa e escolha o lançamento do extrato que é ela. Depois de ligar uma vez, o app
-  reconhece sozinho nas próximas importações. Contas pagas adiantado (aluguel no dia 30 para o dia 5) também casam.
+  **No plano, sem par aqui**: toque numa e escolha o lançamento do extrato que é ela. Essas listas só mostram o que
+  ainda não está conciliado (se o item do plano é a fatura do cartão, o pagamento da fatura, que a importação ignora,
+  também aparece). Depois de ligar uma vez, o app reconhece sozinho nas próximas importações. Contas pagas adiantado
+  (aluguel no dia 30 para o dia 5) também casam.
+- **Conciliar na pergunta:** nas perguntas (“Em que categoria entra?”, “Que dinheiro é esse?”), o bloco **É de um item
+  do plano?** mostra os itens do plano ainda sem par mais parecidos com o lançamento; um toque concilia, e **Outro item
+  do plano** abre a lista inteira. Assim nada passa batido.
 - **Lançado em dobro antes?** Na aba **Mês**, o cartão *Lançado em dobro?* mostra pagamentos que entraram duas vezes
   (a conta marcada e o mesmo pagamento vindo do extrato): **Juntar** deixa um só, com o valor do extrato
   (**Desfazer** volta). No mês atual e no anterior, ele também mostra lançamentos do extrato que pagam uma conta ainda
