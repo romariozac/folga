@@ -309,16 +309,26 @@ export function searchCats(S, kind, q) {
 /** Índice de frases (nomes + palavras-chave + estabelecimentos conhecidos) para reconhecer descrições. */
 export function buildMatcher(S) {
   const list = [];
-  const seen = new Set();
+  const seen = new Map(); // `${categoria}|${frase}|${prefixo}` → item da lista
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const add = (p, c, prefix, boost = 0) => {
-    if (p.length < 2 || seen.has(`${c.id}|${p}|${prefix}`)) return;
-    seen.add(`${c.id}|${p}|${prefix}`);
+    if (p.length < 2) return;
+    const key = `${c.id}|${p}|${prefix}`;
+    const len = p.length + boost;
+    const old = seen.get(key);
+    if (old) {
+      // frase repetida: fica o peso maior (o Delivery já tem "ifood" nas palavras-chave, e o "ifood!" dos
+      // estabelecimentos ainda precisa vencer "pizzaria" e "restaurante")
+      old.len = Math.max(old.len, len);
+      return;
+    }
     const body = esc(p).replace(/\s+/g, '[^a-z0-9&]+');
     // "termo*" pega o começo de palavra (abreviações de fatura); os outros pegam a palavra inteira (plural com s).
     // Número colado no fim vale ("RAIA123", "RENNER512").
     const re = new RegExp(prefix ? `(^|[^a-z0-9&])${body}` : `(^|[^a-z0-9&])${body}s?($|[^a-z&])`);
-    list.push({ re, len: p.length + boost, cat: c.id, kind: c.kind, sub: !!c.parent });
+    const m = { re, len, cat: c.id, kind: c.kind, sub: !!c.parent };
+    seen.set(key, m);
+    list.push(m);
   };
   const visible = new Map();
   for (const c of S.core.cats) {
