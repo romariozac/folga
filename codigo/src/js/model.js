@@ -414,6 +414,27 @@ export const txOf = (S, mk) => (S.months[mk] && S.months[mk].tx) || [];
 /** Item do plano que é a fatura do cartão (o que não se paga dela vira rotativo no banco). */
 export const isCardBill = (l) => l.kind === 'despesa' && (l.cat === 'cartao' || /\b(fatura|cartao)\b/.test(norm(l.name)));
 
+/**
+ * O resto de uma conta paga em parte sai do mês dela e vai para o seguinte (o item “· resto de nov”). Mapa
+ * `${id do item}@${mês}` → quanto saiu, para cada item contar só uma vez: a fatura de 5.000 paga com 2.500 conta
+ * 2.500 em novembro e 2.500 em dezembro (não 5.000 em novembro e mais 2.500 em dezembro).
+ */
+export function restsOut(S) {
+  const out = new Map();
+  for (const r of S.core.plan) {
+    if (!r.rest || !r.amount) continue;
+    const k = `${r.rest.line}@${r.rest.mk}`;
+    out.set(k, (out.get(k) || 0) + r.amount);
+  }
+  return out;
+}
+
+/** Quanto o item do plano conta no mês mk: o previsto, menos o resto que foi para o mês seguinte. */
+export function amountIn(l, mk, out) {
+  const r = out.get(`${l.id}@${mk}`);
+  return r ? Math.max(0, l.amount - r) : l.amount;
+}
+
 /** Previsto x realizado de um mês (por grupo em byCat; por item em bySub). */
 export function monthCalc(S, mk) {
   const lines = S.core.plan.filter((l) => occurs(l, mk));
@@ -426,10 +447,12 @@ export function monthCalc(S, mk) {
   const byCat = {};
   const bySub = {};
   const slot = (map, id, kind) => (map[id] ||= { id, kind, prev: 0, real: 0, n: 0 });
+  const out = restsOut(S);
   for (const l of lines) {
-    prev[l.kind] += l.amount;
-    slot(byCat, gid(l.cat), l.kind).prev += l.amount;
-    slot(bySub, l.cat, l.kind).prev += l.amount;
+    const v = amountIn(l, mk, out);
+    prev[l.kind] += v;
+    slot(byCat, gid(l.cat), l.kind).prev += v;
+    slot(bySub, l.cat, l.kind).prev += v;
   }
   for (const t of txs) {
     real[t.k] += t.v;
@@ -490,13 +513,14 @@ export function carryIn(S, mk) {
 /** Projeção mês a mês (o coração da planilha do Cerbasi: tudo que vai entrar e sair). */
 export function projection(S, fromMk, n = 12) {
   const rows = [];
+  const out = restsOut(S);
   let acc = 0;
   for (let i = 0; i < n; i++) {
     const mk = addMonths(fromMk, i);
     const r = { mk, receita: 0, despesa: 0, invest: 0, extras: [] };
     for (const l of S.core.plan) {
       if (!occurs(l, mk)) continue;
-      r[l.kind] += l.amount;
+      r[l.kind] += amountIn(l, mk, out);
       if (l.rec !== 'mensal' && l.kind === 'despesa') r.extras.push(l);
     }
     r.saldo = r.receita - r.despesa - r.invest;
@@ -601,15 +625,17 @@ export function savings(S, mk) {
 /** Média por mês do plano nos próximos 12 meses: para onde vai a renda. */
 export function planSplit(S, fromMk) {
   const t = { renda: 0, fixas: 0, verbas: 0, anuais: 0, guardar: 0 };
+  const out = restsOut(S);
   for (let i = 0; i < 12; i++) {
     const mk = addMonths(fromMk, i);
     for (const l of S.core.plan) {
       if (!occurs(l, mk)) continue;
-      if (l.kind === 'receita') t.renda += l.amount;
-      else if (l.kind === 'invest') t.guardar += l.amount;
-      else if (l.type === 'verba') t.verbas += l.amount;
-      else if (l.rec === 'mensal') t.fixas += l.amount;
-      else t.anuais += l.amount;
+      const v = amountIn(l, mk, out);
+      if (l.kind === 'receita') t.renda += v;
+      else if (l.kind === 'invest') t.guardar += v;
+      else if (l.type === 'verba') t.verbas += v;
+      else if (l.rec === 'mensal') t.fixas += v;
+      else t.anuais += v;
     }
   }
   for (const k of Object.keys(t)) t[k] = Math.round(t[k] / 12);
