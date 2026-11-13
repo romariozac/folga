@@ -544,11 +544,56 @@ h3 {
 .hero-sub .flag-ic {
   margin-top: 1px;
 }
-/* Início: o saldo já soma o que sobrou (ou faltou) do mês anterior; a linha diz quanto */
+/* Início: o saldo em duas partes (mês anterior · este mês); tocar abre a aba Mês */
 .hero-note {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
   margin: 4px 0 0;
-  color: var(--ink-2);
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
   font-size: 13.5px;
+  color: var(--ink-2);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hero-note b {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hero-note b.neg {
+  color: var(--crit-text);
+}
+.cn-part {
+  white-space: nowrap;
+}
+.cn-sep {
+  color: var(--muted);
+}
+.cn-go {
+  display: inline-flex;
+  margin-left: -4px;
+}
+.cn-go .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+.ck-proj small .cn-sep {
+  margin: 0 2px;
+}
+.ck-proj small b {
+  font-size: inherit;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.ck-proj small b.neg {
+  color: var(--crit-text);
 }
 .hero-note + .hero-sub {
   margin-top: 4px;
