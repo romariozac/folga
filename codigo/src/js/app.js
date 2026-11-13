@@ -119,6 +119,16 @@ document.addEventListener('click', (e) => {
       render();
       break;
     }
+    case 'flow-toggle': {
+      // lançamentos da aba Mês: abre ou fecha entradas, despesas ou investimento
+      const set = ctx.ui.openFlows;
+      if (set.has(d.k)) set.delete(d.k);
+      else set.add(d.k);
+      render();
+      const btn = $(`[data-act="flow-toggle"][data-k="${d.k}"]`);
+      if (btn) btn.focus({ preventScroll: true });
+      break;
+    }
     case 'tx-filter': {
       // tocar de novo no mesmo ícone (ou item) desfaz o filtro
       const f = ctx.ui.txFilter;

@@ -900,6 +900,30 @@ h3 {
 .f-in .flow-amt {
   color: var(--good-text);
 }
+/* lançamentos da aba Mês: a faixa abre e fecha a parte (começa fechada) */
+.flow-title {
+  margin: 0;
+  font: inherit;
+}
+.flow-btn {
+  width: calc(100% + 20px);
+  border: 0;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.flow-btn .chev {
+  display: inline-flex;
+  margin-left: -2px;
+}
+.flow-btn .chev .ic {
+  color: var(--ink-2);
+}
+.flow.shut {
+  padding-bottom: 0;
+}
 .flow .day {
   margin-top: 12px;
   color: var(--ink-2);
