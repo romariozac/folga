@@ -168,6 +168,26 @@ Nubank são tratados como investimento/resgate e saques vão para *Saque em dinh
 No item do plano (ou tocando na conta em “Contas do mês”), ligue **Débito automático**: no dia do vencimento a conta
 é marcada como paga sozinha (streaming, academia, plano de saúde…). Para salário, “cai sozinho na conta”.
 
+## Fechamento do mês: o que faltou virou o quê?
+
+No banco não existe saldo negativo: quando um mês termina faltando dinheiro (gastou mais do que entrou), isso virou
+dívida ou saiu da reserva. No começo do mês seguinte, o Início pergunta uma vez: **"Novembro terminou faltando
+R$ 1.000. Como ficou?"** (com **Depois**, que volta a perguntar em 3 dias, e o lembrete de importar antes a fatura ou o
+extrato do mês). Pode marcar mais de uma opção; com mais de uma, cada uma leva o seu valor e a soma tem de bater.
+
+| Opção | O que o app faz |
+|---|---|
+| 💳 **Gastei no cartão** (vai na fatura do mês seguinte) | Nada a lançar: as compras já contam no mês em que você comprou. O mês seguinte começa com o saldo anterior negativo, com a legenda *No cartão: entra na fatura de dezembro*. Sem juros, se pagar a fatura inteira. |
+| 🧾 **Paguei só parte da fatura** (rotativo) | O saldo anterior negativo fica, com a legenda *no rotativo do cartão*, e o plano do mês seguinte ganha os juros estimados (15% ao mês; o valor certo entra ao importar a fatura). |
+| 🏦 **Cheque especial** | Igual, com juros estimados de até 8% ao mês (o valor certo entra ao importar o extrato). |
+| 📄 **Parcelei ou peguei empréstimo** | Lança uma entrada no mês que faltou (o banco cobriu) e cria as parcelas no plano, com o total de juros. O mês seguinte começa do zero. |
+| 🐷 **Usei a reserva** | Lança o resgate da reserva (a reserva diminui) e, se quiser, um item para repor aos poucos. O mês seguinte começa do zero. |
+
+A dívida aparece **uma vez só**: como saldo negativo, como juros ou como parcelas. Se depois da resposta entrar mais
+coisa no mês (a fatura importada mais tarde, por exemplo), *Gastei no cartão* sozinho vale para o valor que for; nas
+outras respostas, o app pergunta só a diferença. Na aba **Mês** do mês fechado, a linha *Faltaram R$ … : …* mostra a
+resposta, com **alterar** (trocar ou apagar a resposta tira o que ela tinha lançado; **Desfazer** volta).
+
 ## Como o app aplica o método Cerbasi
 
 | Ideia do método | No Folga |

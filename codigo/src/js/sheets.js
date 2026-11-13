@@ -803,6 +803,192 @@ export function openCarry(mk) {
   );
 }
 
+// =============== FECHAMENTO DO MÊS ===============
+const CLOSE_ORDER = ['cartao', 'rotativo', 'cheque', 'parcelado', 'reserva'];
+
+/**
+ * O mês mk (já fechado) terminou faltando dinheiro: como isso ficou no banco? Pode marcar mais de uma opção;
+ * com mais de uma, cada uma leva o seu valor e a soma tem de bater com o que faltou.
+ */
+export function openClose(mk) {
+  const st = S();
+  const H = M.CLOSE_HOW;
+  const g = M.shortfall(st, mk);
+  const rec = M.closeOf(st, mk);
+  const mes = U.monthName(mk);
+  const next = U.addMonths(mk, 1);
+  const prox = U.monthName(next);
+  const parse = (s) => U.parseMoney(s || '');
+  if (g < 100) {
+    openSheet(
+      `${sheetHead(`Fechar ${mes}`, `Pelo que está lançado hoje, ${mes} não terminou faltando dinheiro.`)}
+      ${rec ? `<div class="row-btns"><button type="button" class="btn ghost" data-drop>Apagar a resposta de antes</button></div>` : '<div class="row-btns"><button type="button" class="btn primary" data-sheet-close>Ok</button></div>'}`,
+      { onMount: (el, close) => mountDrop(el, close) }
+    );
+    return;
+  }
+  // reserva antes da resposta de agora (a resposta de antes já tirou dela)
+  const coverRes = U.sum(M.txOf(st, mk).filter((t) => t.cv && t.c === 'reserva'), (t) => t.v);
+  const reserve = M.reserveBalance(st) - coverRes;
+  const was = rec && !rec.parts.some((p) => p.all) ? U.sum(rec.parts, (p) => p.v) : null;
+  const pre = new Map((rec ? rec.parts : []).map((p) => [p.how, p]));
+
+  const moneyIn = (f, v, extra = '') => `<div class="money-in"><span>R$</span><input data-f="${f}" inputmode="decimal" value="${v ? U.moneyInput(v) : ''}" ${extra}></div>`;
+  const moreHTML = (how) => {
+    const p = pre.get(how) || {};
+    const amt = `<label class="field cl-amt"><span>Quanto foi assim</span>${moneyIn('v', p.v || 0, 'placeholder="0,00"')}</label>`;
+    let body = '';
+    if (how === 'cartao') body = `<p class="help">Nada a lançar: as compras já contam em ${mes}. ${U.cap(prox)} começa com esse valor negativo, que sai do salário de ${prox} quando você paga a fatura.</p>`;
+    if (how === 'rotativo' || how === 'cheque') {
+      const rate = M.CLOSE_RATE[how];
+      body = `<label class="field"><span>Juros estimados em ${prox}</span>${moneyIn('juros', p.juros || 0, 'data-auto="' + (p.juros ? 0 : 1) + '" placeholder="0,00"')}
+        <small class="help">${how === 'rotativo' ? `Estimativa de ${rate * 100}% ao mês. O valor certo entra quando você importar a fatura.` : `Até ${rate * 100}% ao mês. O valor certo entra quando você importar o extrato.`}</small></label>`;
+    }
+    if (how === 'parcelado')
+      body = `<div class="two">
+          <label class="field"><span>Parcelas</span><input data-f="n" inputmode="numeric" value="${p.n || ''}" placeholder="6"></label>
+          <label class="field"><span>Valor de cada parcela</span>${moneyIn('p', p.p || 0, 'placeholder="0,00"')}</label>
+        </div>
+        <p class="help" data-prev></p>`;
+    if (how === 'reserva')
+      body = `<p class="help" data-res></p>
+        <label class="tog inline"><input type="checkbox" data-f="reporOn" ${p.repor ? 'checked' : ''}><span>Repor a reserva aos poucos</span></label>
+        <div class="cl-repor" data-repor ${p.repor ? '' : 'hidden'}><label class="field"><span>Quanto por mês</span>${moneyIn('repor', p.repor || 0, 'placeholder="0,00"')}</label><p class="help" data-repor-txt></p></div>`;
+    return `${amt}${body}`;
+  };
+  const optHTML = (how) => {
+    const o = H[how];
+    return `<div class="cl-opt" data-how="${how}">
+      <label class="tog cl-tog"><input type="checkbox" data-pick="${how}" ${pre.has(how) ? 'checked' : ''}><span class="cl-emo" aria-hidden="true">${o.emo}</span><span class="cl-txt"><b>${o.name}</b><small>${o.help}</small></span></label>
+      <div class="cl-more" ${pre.has(how) ? '' : 'hidden'}>${moreHTML(how)}</div>
+    </div>`;
+  };
+  openSheet(
+    `${sheetHead(`Fechar ${mes}`, `Terminou faltando <b>${m0(g)}</b>. No banco não existe saldo negativo: o que faltou virou dívida ou saiu da reserva. Como ficou?`)}
+    ${was != null && was !== g ? `<p class="cl-changed">Mudou desde a sua resposta: antes faltavam ${m0(was)}, agora faltam ${m0(g)}.</p>` : ''}
+    <form class="form cl-form" novalidate>
+      <p class="help">Pode marcar mais de uma.</p>
+      <div class="cl-opts">${CLOSE_ORDER.map(optHTML).join('')}</div>
+      <p class="cl-status" data-status role="status"></p>
+      <button class="btn primary wide" type="submit" data-save>Salvar</button>
+      ${rec ? '<button type="button" class="link small cl-drop" data-drop>Apagar a resposta</button>' : ''}
+    </form>`,
+    {
+      label: `Fechar ${mes}`,
+      onMount: (el, close) => {
+        const form = $('form', el);
+        const opt = (how) => $(`.cl-opt[data-how="${how}"]`, el);
+        const f = (how, name) => $(`[data-f="${name}"]`, opt(how));
+        const picked = () => CLOSE_ORDER.filter((h) => $(`[data-pick="${h}"]`, el).checked);
+        // valor de cada opção: com uma só, é tudo o que faltou
+        const amount = (how, list = picked()) => (list.length === 1 ? g : parse(f(how, 'v').value));
+        const update = () => {
+          const list = picked();
+          const multi = list.length > 1;
+          for (const h of CLOSE_ORDER) {
+            const on = list.includes(h);
+            opt(h).classList.toggle('on', on);
+            $('.cl-more', opt(h)).hidden = !on;
+            $('.cl-amt', opt(h)).hidden = !multi;
+          }
+          let ok = list.length > 0;
+          for (const h of list) {
+            const v = amount(h, list);
+            if (v <= 0) ok = false;
+            if (h === 'rotativo' || h === 'cheque') {
+              const j = f(h, 'juros');
+              if (j.dataset.auto === '1') j.value = v > 0 ? U.moneyInput(Math.round((v * M.CLOSE_RATE[h]) / 100) * 100) : '';
+            }
+            if (h === 'parcelado') {
+              const n = parseInt(f(h, 'n').value, 10) || 0;
+              const pv = parse(f(h, 'p').value);
+              const prev = $('[data-prev]', opt(h));
+              if (n > 0 && pv > 0) {
+                const tot = n * pv;
+                const juros = tot - v;
+                prev.innerHTML = `${n} × ${m0(pv)} = <b>${m0(tot)}</b>${juros > 0 ? ` · ${m0(juros)} de juros` : ''} · de ${prox} a ${U.monthName(U.addMonths(next, n - 1))}`;
+              } else {
+                prev.textContent = `Veja no banco em quantas vezes ficou e o valor de cada parcela. Começa em ${prox}.`;
+                ok = false;
+              }
+            }
+            if (h === 'reserva') {
+              $('[data-res]', opt(h)).innerHTML = `Reserva no app: ${m0(reserve)} → <b class="${reserve - v < 0 ? 'neg' : ''}">${m0(reserve - v)}</b>${reserve - v < 0 ? '. A reserva no app tem menos que isso: confira em Metas.' : ''}`;
+              const rOn = f(h, 'reporOn').checked;
+              const box = $('[data-repor]', opt(h));
+              box.hidden = !rOn;
+              if (rOn) {
+                const r = f(h, 'repor');
+                if (!parse(r.value) && v > 0) r.value = U.moneyInput(M.roundUp10(v / 6));
+                const rv = parse(r.value);
+                $('[data-repor-txt]', opt(h)).textContent = rv > 0 && v > 0 ? `Em ${U.plural(Math.ceil(v / rv), 'mês', 'meses')}, a partir de ${prox}.` : '';
+                if (rv <= 0) ok = false;
+              }
+            }
+          }
+          const st2 = $('[data-status]', el);
+          if (multi) {
+            const tot = U.sum(list, (h) => amount(h, list));
+            const diff = g - tot;
+            if (diff !== 0) ok = false;
+            st2.className = `cl-status ${diff === 0 ? 'done' : 'warn'}`;
+            st2.textContent = diff > 0 ? `Falta distribuir ${m0(diff)} de ${m0(g)}.` : diff < 0 ? `Passou ${m0(-diff)} do que faltou (${m0(g)}).` : `Os ${m0(g)} estão distribuídos.`;
+          } else {
+            st2.className = 'cl-status';
+            st2.textContent = '';
+          }
+          $('[data-save]', el).disabled = !ok;
+        };
+        el.addEventListener('change', (e) => {
+          if (e.target.matches('[data-pick]')) {
+            const list = picked();
+            // ao passar a ter mais de uma, a primeira fica com tudo e as outras começam vazias
+            if (list.length === 2 && e.target.checked) {
+              const first = list.find((h) => h !== e.target.dataset.pick);
+              if (!parse(f(first, 'v').value)) f(first, 'v').value = U.moneyInput(g);
+            }
+          }
+          update();
+        });
+        el.addEventListener('input', (e) => {
+          if (e.target.matches('[data-f="juros"]')) e.target.dataset.auto = '0';
+          update();
+        });
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          update();
+          if ($('[data-save]', el).disabled) return;
+          const list = picked();
+          const parts = list.map((h) => {
+            const p = { how: h, v: amount(h, list) };
+            if (h === 'rotativo' || h === 'cheque') p.juros = parse(f(h, 'juros').value);
+            if (h === 'parcelado') Object.assign(p, { n: parseInt(f(h, 'n').value, 10), p: parse(f(h, 'p').value) });
+            if (h === 'reserva' && f(h, 'reporOn').checked) p.repor = parse(f(h, 'repor').value);
+            return p;
+          });
+          const u = A.saveClose(mk, parts);
+          close();
+          rerender();
+          toast(`${U.cap(mes)} fechado.`, { action: { label: 'Desfazer', fn: () => { A.undoClose(u); rerender(); } } });
+        });
+        mountDrop(el, close);
+        update();
+      },
+    }
+  );
+
+  function mountDrop(el, close) {
+    const b = $('[data-drop]', el);
+    if (!b) return;
+    b.addEventListener('click', () => {
+      const u = A.dropClose(mk);
+      close();
+      rerender();
+      toast('Resposta apagada.', { action: { label: 'Desfazer', fn: () => { A.undoClose(u); rerender(); } } });
+    });
+  }
+}
+
 // =============== RESERVA ===============
 export function openReserve() {
   const st = S();

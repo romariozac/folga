@@ -610,6 +610,92 @@ export function restoreRest(l2) {
   store.save(['core']);
 }
 
+// ---------- fechamento do mês: como foi coberto o que faltou ----------
+/** Tira tudo o que a resposta do mês criou (entradas de cobertura e itens do plano) e a própria resposta. */
+function clearClose(mk) {
+  const st = S();
+  const b = st.months[mk];
+  if (b) b.tx = b.tx.filter((t) => t.cv !== mk);
+  st.core.plan = st.core.plan.filter((l) => l.cover !== mk);
+  if (st.core.closes) delete st.core.closes[mk];
+}
+
+/** Como estava antes de mexer na resposta do mês (para desfazer). */
+function closeSnap(mk) {
+  const st = S();
+  return JSON.stringify({ plan: st.core.plan, tx: (st.months[mk] && st.months[mk].tx) || null, rec: M.closeOf(st, mk) });
+}
+
+/**
+ * Guarda como foi coberto o que faltou no mês mk (já fechado). parts: [{ how, v, juros?, n?, p?, repor? }].
+ * Uma resposta só, de cartão, rotativo ou cheque especial, vale para o valor que faltar (all), mesmo que mude
+ * ao importar mais coisas do mês. Devolve o que desfaz.
+ */
+export function saveClose(mk, parts) {
+  const st = S();
+  const undo = { mk, snap: closeSnap(mk) };
+  clearClose(mk);
+  const next = U.addMonths(mk, 1);
+  const last = `${mk}-${U.pad(U.daysInMonth(mk))}`;
+  const ms = U.monthShort(mk);
+  const plan = (l) => st.core.plan.push({ id: U.uid(), type: 'conta', start: next, cover: mk, ...l });
+  const cover = (t) => (st.months[mk] ||= { updatedAt: 0, tx: [] }).tx.push({ id: U.uid(), d: last, cv: mk, t: Date.now(), ...t });
+  const single = parts.length === 1;
+  const rec = { at: today(), parts: [] };
+  for (const p of parts) {
+    const out = { how: p.how, v: p.v };
+    if (single && M.CLOSE_HOW[p.how].label) out.all = true;
+    if ((p.how === 'rotativo' || p.how === 'cheque') && p.juros > 0) {
+      // estimativa só para a previsão: os juros de verdade entram ao importar a fatura ou o extrato (mesma categoria)
+      plan({ name: p.how === 'rotativo' ? `Juros do rotativo de ${ms} (estimativa)` : `Juros do cheque especial de ${ms} (estimativa)`, kind: 'despesa', cat: 'cartao', amount: p.juros, type: 'verba', rec: 'unico' });
+      out.juros = p.juros;
+    }
+    if (p.how === 'parcelado') {
+      cover({ v: p.v, k: 'receita', c: 'outras_rec', n: `Parcelamento: cobriu o que faltou em ${ms}` });
+      plan({ name: `Parcelamento de ${ms}`, kind: 'despesa', cat: 'emprestimo', amount: p.p, rec: 'parcelas', count: p.n });
+      Object.assign(out, { n: p.n, p: p.p });
+    }
+    if (p.how === 'reserva') {
+      cover({ v: -p.v, k: 'invest', c: 'reserva', n: `Resgate da reserva: cobriu o que faltou em ${ms}` });
+      if (p.repor > 0) {
+        plan({ name: 'Repor a reserva', kind: 'invest', cat: 'reserva', amount: p.repor, rec: 'parcelas', count: Math.ceil(p.v / p.repor) });
+        out.repor = p.repor;
+      }
+    }
+    rec.parts.push(out);
+  }
+  (st.core.closes ||= {})[mk] = rec;
+  store.save(['core', 'm-' + mk]);
+  return undo;
+}
+
+/** Apaga a resposta do mês (e o que ela criou). Devolve o que desfaz. */
+export function dropClose(mk) {
+  const undo = { mk, snap: closeSnap(mk) };
+  clearClose(mk);
+  store.save(['core', 'm-' + mk]);
+  return undo;
+}
+
+export function undoClose(u) {
+  const st = S();
+  const s = JSON.parse(u.snap);
+  st.core.plan = s.plan;
+  if (s.tx) (st.months[u.mk] ||= { updatedAt: 0, tx: [] }).tx = s.tx;
+  else if (st.months[u.mk]) st.months[u.mk].tx = st.months[u.mk].tx.filter((t) => t.cv !== u.mk);
+  st.core.closes ||= {};
+  if (s.rec) st.core.closes[u.mk] = s.rec;
+  else delete st.core.closes[u.mk];
+  store.save(['core', 'm-' + u.mk]);
+}
+
+/** “Depois”: o cartão do fechamento some do Início por 3 dias. */
+export function snoozeClose(mk) {
+  const st = S();
+  st.core.settings.closeSnooze = { mk, until: U.addDays(today(), 3) };
+  store.save(['core']);
+}
+
 // ---------- conciliar depois (no mês) ----------
 /**
  * O lançamento do extrato vira o pagamento da conta do plano (no mês da conta, com a categoria dela); a marcação

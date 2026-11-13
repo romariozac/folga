@@ -166,8 +166,20 @@ document.addEventListener('click', (e) => {
       ctx.ui.billsExpanded = !ctx.ui.billsExpanded;
       render();
       break;
-    case 'tx-open':
-      SH.openTxEdit(d.mk, d.id);
+    case 'tx-open': {
+      // entrada que cobriu o que faltou num mês (parcelamento, reserva): muda-se pela resposta do fechamento
+      const t = A.findTx(d.mk, d.id);
+      if (t && t.cv) SH.openClose(t.cv);
+      else SH.openTxEdit(d.mk, d.id);
+      break;
+    }
+    case 'close-open':
+      SH.openClose(d.mk);
+      break;
+    case 'close-later':
+      A.snoozeClose(d.mk);
+      render();
+      toast('Tudo bem. Pergunto de novo em 3 dias.');
       break;
     case 'mk-prev':
       ctx.ui.mk = U.addMonths(ctx.ui.mk, -1);
