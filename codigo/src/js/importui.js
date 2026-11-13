@@ -54,6 +54,7 @@ export function openImport() {
     learnOn: true,
     learned: new Map(),
     replace: true,
+    dropWrong: true, // apagar as compras negadas que tinham entrado numa leitura anterior
     acertos: null,
     open: { add: false, ign: false, dup: false },
     error: '',
@@ -111,6 +112,26 @@ export function openImport() {
         regroup();
         st.step = st.questions.length ? 'ask' : 'review';
         draw();
+      };
+
+      /** Compras que o banco negou ou cancelou (ficam de fora) e as que já tinham entrado antes por engano. */
+      const declinedOf = () => st.items.map((it, i) => ({ it, i })).filter(({ it }) => it.declined && it.status === 'ignore');
+      const wrongOf = () => declinedOf().filter(({ it }) => it.wrong);
+      const listOf = (list) => {
+        const g = new Map();
+        for (const { it } of list) {
+          const k = `${it.desc.toLowerCase()}|${it.amount}`;
+          const x = g.get(k) || { desc: it.desc, amount: it.amount, n: 0 };
+          x.n++;
+          g.set(k, x);
+        }
+        return U.listPT([...g.values()].map((x) => `${esc(x.desc)} (${x.n > 1 ? `${x.n} × ` : ''}${money(x.amount)})`));
+      };
+      const declinedHTML = () => {
+        const dl = declinedOf();
+        if (!dl.length) return '';
+        const w = wrongOf().length;
+        return `<p class="ok-line">${IC.check} Deixei de fora ${dl.length === 1 ? '1 compra que o banco negou' : `${dl.length} compras que o banco negou`}: ${listOf(dl)}.${w ? ` ${w === 1 ? 'Ela já tinha entrado' : `${w} delas já tinham entrado`} numa leitura anterior: na revisão dá para apagar.` : ''}</p>`;
       };
 
       const counts = () => {
@@ -200,6 +221,7 @@ export function openImport() {
             <li><b>${c.ignore + c.dup}</b><span>ignorados ou repetidos</span></li>
           </ul>
           ${checkHTML()}
+          ${declinedHTML()}
           ${st.items.some((i) => i.moved) ? `<p class="help">${U.plural(st.items.filter((i) => i.moved).length, 'parcela ou crédito com data antiga entra', 'parcelas ou créditos com data antiga entram')} no mês desta fatura, que é quando você paga.</p>` : ''}
           ${/print/.test(st.source) ? '<p class="help">Lido dos prints aqui no celular. Confira datas e valores na revisão: dá para mudar o que vier errado.</p>' : ''}
           <p class="card-sub">Eu reconheço estabelecimentos comuns (iFood, Uber, Netflix, postos, farmácias…) e aprendo com as suas respostas: da próxima vez, pergunto menos.</p>
@@ -531,6 +553,8 @@ export function openImport() {
         const guardado = U.sum(add.filter(({ it }) => it.kind === 'invest'), ({ it }) => it.amount);
         const bills = add.filter(({ it }) => it.p);
         const showN = st.open.add ? add.length : Math.min(add.length, 8);
+        const wrong = wrongOf();
+        const drop = st.dropWrong ? wrong.length : 0;
         const toggleRow = ({ it, i }) =>
           `<li class="imp-skip"><span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)} · ${money(it.amount)} · ${esc(it.reason)}</small></span><button type="button" class="btn ghost small" data-include="${i}">Lançar</button></li>`;
         return `${sheetHead('Tudo pronto para lançar', `${st.parsed.bank ? st.parsed.bank + ' · ' : ''}${st.source} · ${TYPE_LABEL[st.type]}`)}
@@ -541,6 +565,11 @@ export function openImport() {
             <div><span>Lançamentos</span><b>${add.length}</b></div>
           </div>
           ${bills.length ? `<p class="ok-line">${IC.check} ${U.plural(bills.length, 'conciliado', 'conciliados')} com o plano: ${esc(U.listPT(bills.map(({ it }) => it.billName)))}.</p>` : ''}
+          ${
+            wrong.length
+              ? `<label class="tog"><input type="checkbox" data-drop-wrong ${st.dropWrong ? 'checked' : ''}><span>Apagar ${wrong.length === 1 ? 'a compra negada que já tinha entrado' : `as ${wrong.length} compras negadas que já tinham entrado`} numa leitura anterior: ${listOf(wrong)}</span></label>`
+              : ''
+          }
           ${hasConc() ? `<button type="button" class="link" data-go="conc">${bills.length ? 'Rever a conciliação' : 'Conciliar com o plano'}</button>` : ''}
           ${
             st.acertos && st.acertos.list.length
@@ -553,7 +582,7 @@ export function openImport() {
           ${ign.length ? `<h3 class="group">Ignorados<span>${ign.length}</span></h3>${st.open.ign ? `<ul class="txs">${ign.map(toggleRow).join('')}</ul>` : `<button type="button" class="link" data-open="ign">Ver por quê</button>`}` : ''}
           ${dup.length ? `<h3 class="group">Já lançados antes<span>${dup.length}</span></h3>${st.open.dup ? `<ul class="txs">${dup.map(toggleRow).join('')}</ul>` : `<button type="button" class="link" data-open="dup">Ver quais</button>`}` : ''}
           <p class="help">Entradas e saídas vieram trocadas? <button type="button" class="link" data-flip>Inverter</button></p>
-          <div class="row-btns stick"><button type="button" class="btn lime wide" data-commit ${add.length ? '' : 'disabled'}>Lançar ${U.plural(add.length, 'item', 'itens')} · +30 XP</button></div>`;
+          <div class="row-btns stick"><button type="button" class="btn lime wide" data-commit ${add.length || drop ? '' : 'disabled'}>${add.length || !drop ? `Lançar ${U.plural(add.length, 'item', 'itens')} · +30 XP` : `Apagar ${drop === 1 ? 'a compra negada' : `as ${drop} compras negadas`}`}</button></div>`;
       };
 
       const draw = (keepScroll = false) => {
@@ -616,6 +645,10 @@ export function openImport() {
           draw(true);
         }
         if (e.target.matches('[data-replace]')) st.replace = e.target.checked;
+        if (e.target.matches('[data-drop-wrong]')) {
+          st.dropWrong = e.target.checked;
+          draw(true);
+        }
       });
       el.addEventListener('input', (e) => {
         if (e.target.matches('[data-qsearch]')) {
@@ -792,13 +825,17 @@ export function openImport() {
         }
         if (t('[data-commit]')) {
           const learn = [...st.learned].map(([key, cat]) => ({ key, cat }));
-          const res = A.commitImport(st.items, { replaceAcertos: st.replace ? st.acertos : null, learn });
+          const dropWrong = st.dropWrong ? wrongOf().map(({ it }) => it.wrong) : [];
+          const res = A.commitImport(st.items, { replaceAcertos: st.replace ? st.acertos : null, learn, dropWrong });
           close();
           ctx.render();
+          const dropTxt = res.dropped ? `${res.dropped === 1 ? 'Apagada 1 compra negada' : `Apagadas ${res.dropped} compras negadas`} que tinham entrado antes.` : '';
           A.notify(
-            `Importado: <b>${U.plural(res.count, 'lançamento', 'lançamentos')}</b>${res.linked ? ` (${U.plural(res.linked, 'conciliado', 'conciliados')} com o plano)` : ''}${res.out ? ` · gastos ${m0(res.out)}` : ''}${res.inn ? ` · receitas ${m0(res.inn)}` : ''}.`,
+            res.count || !res.dropped
+              ? `Importado: <b>${U.plural(res.count, 'lançamento', 'lançamentos')}</b>${res.linked ? ` (${U.plural(res.linked, 'conciliado', 'conciliados')} com o plano)` : ''}${res.out ? ` · gastos ${m0(res.out)}` : ''}${res.inn ? ` · receitas ${m0(res.inn)}` : ''}.${dropTxt ? `<br><small>${dropTxt}</small>` : ''}`
+              : dropTxt,
             res.events,
-            res.count
+            res.count || res.dropped
               ? {
                   label: 'Desfazer',
                   fn: () => {
