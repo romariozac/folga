@@ -208,6 +208,46 @@ export function saveLine(line) {
   return events;
 }
 
+/**
+ * Mudou o valor olhando um mês do plano e escolheu “desse mês em diante”: o item vira dois. O de antes fica como
+ * estava e termina no mês anterior; o novo começa no mês, com o que foi editado. Lançamentos, restos de contas
+ * pagas em parte e automáticos desmarcados desse mês em diante passam para o item novo (as contas continuam marcadas).
+ */
+export function splitLine(old, edited, mk) {
+  const st = S();
+  const cur = st.core.plan.find((l) => l.id === old.id) || old;
+  const neu = { ...edited, id: U.uid(), start: mk };
+  if (neu.end && neu.end < mk) delete neu.end;
+  cur.end = U.addMonths(mk, -1);
+  const i = st.core.plan.indexOf(cur);
+  if (i >= 0) st.core.plan.splice(i + 1, 0, neu);
+  else st.core.plan.push(neu);
+  const keys = ['core'];
+  for (const m of Object.keys(st.months)) {
+    if (m < mk) continue;
+    let moved = false;
+    for (const t of st.months[m].tx || [])
+      if (t.p === cur.id) {
+        t.p = neu.id;
+        moved = true;
+      }
+    if (moved) keys.push('m-' + m);
+  }
+  for (const l of st.core.plan) if (l.rest && l.rest.line === cur.id && l.rest.mk >= mk) l.rest = { ...l.rest, line: neu.id };
+  const skip = st.core.autoSkip || {};
+  for (const k of Object.keys(skip)) {
+    const [id, m] = k.split('@');
+    if (id === cur.id && m >= mk) {
+      skip[`${neu.id}@${m}`] = skip[k];
+      delete skip[k];
+    }
+  }
+  const events = [];
+  checkVisao(events);
+  store.save(keys);
+  return { line: neu, events };
+}
+
 export function deleteLine(id) {
   S().core.plan = S().core.plan.filter((l) => l.id !== id);
   store.save(['core']);

@@ -545,16 +545,16 @@ export function monthHTML() {
  * fica embaixo do valor (como o % embaixo do total do grupo); embaixo do nome, só o que o grupo ainda não diz
  * (mês do gasto anual, em que parcela está, quando acaba).
  */
-function planItemHTML(l, mk) {
+function planItemHTML(l, mk, { v = l.amount, sel = null } = {}) {
   const cat = M.catById(S(), l.cat);
   const meta = M.planMeta(l, mk);
   const day = M.planDay(l, mk);
   // item de uma meta abre a meta (valor, prazo e o que já foi guardado ficam juntos lá)
-  const act = l.goal && M.goalById(S(), l.goal) ? `data-act="goal-open" data-id="${l.goal}"` : `data-act="line-open" data-line="${l.id}"`;
+  const act = l.goal && M.goalById(S(), l.goal) ? `data-act="goal-open" data-id="${l.goal}"` : `data-act="line-open" data-line="${l.id}"${sel ? ` data-mk="${sel}"` : ''}`;
   return `<li${M.ended(l, mk) ? ' class="ended"' : ''}><button class="pl-item" ${act}>
     <span class="pl-emo">${cat.emoji}</span>
     <span class="pl-txt"><b>${esc(l.name)}</b>${meta ? `<small>${meta}</small>` : ''}</span>
-    <span class="pl-amt">${m0(l.amount)}${day ? `<small>dia ${day}</small>` : ''}</span>
+    <span class="pl-amt">${m0(v)}${day ? `<small>dia ${day}</small>` : ''}</span>
   </button></li>`;
 }
 
@@ -592,6 +592,72 @@ function splitBarHTML(parts, label) {
   return `<div class="split-bar" role="img" aria-label="${esc(`${label}. ${desc}`)}">${shown.map((p) => `<i class="${p.cls}" style="flex-grow:${p.v}"></i>`).join('')}</div>`;
 }
 
+/** Mês escolhido no gráfico da aba Plano (posição na projeção): o que a pessoa tocou, ou o primeiro mês no vermelho. */
+function planSelIndex(rows) {
+  const firstNeg = rows.findIndex((r) => r.saldo < 0);
+  return Math.min(rows.length - 1, Math.max(0, ctx.ui.planSel ?? firstNeg));
+}
+
+/**
+ * Itens do plano. Seguem o mês escolhido no gráfico (só o que acontece nele, com os valores dele, como o quadro
+ * acima); em “Todos”, a lista inteira com a média por mês. Tocar noutro mês do gráfico refaz só este cartão.
+ */
+function planItemsHTML(st, cm, rows, anim = '') {
+  const plan = st.core.plan;
+  const sel = rows[planSelIndex(rows)].mk;
+  const all = !!ctx.ui.planAll;
+  const mk = all ? cm : sel;
+  const s = M.planSplit(st, mk, all ? 12 : 1);
+  const out = M.restsOut(st);
+  const pct = (v) => (s.renda > 0 ? `${Math.round((v / s.renda) * 100)}%` : '');
+  const part = (id) => plan.filter((l) => M.splitPart(l) === id && (all || M.occurs(l, mk)));
+  // os grupos do plano são as partes da renda: a mesma cor na barra e na linha do grupo
+  const groups = [
+    { id: 'receita', cls: 'in', name: 'Renda', v: s.renda, items: part('renda') },
+    { id: 'fixas', cls: 'p-fixas', name: 'Contas fixas', v: s.fixas, items: part('fixas') },
+    { id: 'verbas', cls: 'p-verbas', name: 'Dia a dia', v: s.verbas, items: part('verbas') },
+    { id: 'anuais', cls: 'p-anuais', name: 'Anuais e parcelas', v: s.anuais, sub: all ? 'separe esse valor todo mês' : '', items: part('anuais') },
+    { id: 'guardar', cls: 'p-guardar', name: 'Guardar', v: s.guardar, items: part('guardar') },
+  ].filter((g) => g.items.length);
+  const itemHTML = (l) => (all ? planItemHTML(l, mk) : planItemHTML(l, mk, { v: M.amountIn(l, mk, out), sel: mk }));
+  const groupHTML = (gr) => {
+    const open = ctx.ui.planOpen.has(gr.id);
+    return `<div class="pg${open ? ' open' : ''}">
+      <button class="pg-head" data-act="plan-group" data-id="${gr.id}" aria-expanded="${open}">
+        <i class="sw ${gr.cls}"></i><span class="pg-txt"><b>${gr.name}</b><small>${gr.sub || U.plural(gr.items.length, 'item', 'itens')}</small></span>
+        <span class="pg-amt">${m0(gr.v)}${gr.id === 'receita' ? '' : `<small>${pct(gr.v)}</small>`}</span><span class="chev ${open ? 'up' : ''}">${IC.right}</span>
+      </button>
+      ${open ? `<ul class="pl-list">${M.planOrder(gr.items, mk).map(itemHTML).join('')}</ul>` : ''}
+    </div>`;
+  };
+  const parts = [...groups.filter((g) => g.id !== 'receita').map((g) => ({ cls: g.cls, name: g.name, v: g.v })), { cls: 'p-sobra', name: 'Sobra livre', v: Math.max(0, s.sobra) }];
+  const sobraRow = `<div class="pg pg-static"><div class="pg-head"><i class="sw p-sobra"></i><span class="pg-txt"><b>${s.sobra < 0 ? 'Falta' : 'Sobra livre'}</b></span><span class="pg-amt ${s.sobra < 0 ? 'neg' : ''}">${m0(Math.abs(s.sobra))}<small>${s.sobra < 0 ? '' : pct(s.sobra)}</small></span><span class="chev-space"></span></div></div>`;
+  const scope = `<div class="seg full pl-scope" role="group" aria-label="Quais itens mostrar">
+      <button type="button" class="${all ? '' : 'on'}" data-act="plan-scope" data-v="mes" aria-pressed="${!all}">${U.monthLabel(sel)}</button>
+      <button type="button" class="${all ? 'on' : ''}" data-act="plan-scope" data-v="todos" aria-pressed="${all}">Todos</button>
+    </div>`;
+  return `<section class="card ${anim}" data-plan-items>
+      <div class="card-head"><h2>Itens do plano</h2><button class="btn small lime" data-act="line-new"${all ? '' : ` data-start="${sel}"`}>${IC.plus}Adicionar</button></div>
+      ${scope}
+      ${
+        groups.length
+          ? `<p class="eyebrow pg-eyebrow">${all ? 'Média por mês' : `Só o que acontece em ${U.monthName(sel)}`}</p>
+      ${splitBarHTML(parts, all ? 'Para onde vai a renda, média por mês' : `Para onde vai a renda em ${U.monthLabel(sel)}`)}
+      <div class="pg-list">${groups.map(groupHTML).join('')}${sobraRow}</div>`
+          : `<p class="card-sub pl-none">Nada no plano em ${U.monthLabel(sel).toLowerCase()}. Toque em “Todos” para ver a lista inteira.</p>`
+      }
+    </section>`;
+}
+
+/** Tocou noutro mês no gráfico: refaz só o cartão dos itens (o gráfico e o resto da página ficam como estão). */
+export function refreshPlanItems() {
+  const box = document.querySelector('[data-plan-items]');
+  if (!box) return;
+  const st = S();
+  const cm = curMk();
+  box.outerHTML = planItemsHTML(st, cm, M.projection(st, cm, 12));
+}
+
 export function planHTML() {
   rv = 0;
   const st = S();
@@ -601,28 +667,6 @@ export function planHTML() {
   const rows = M.projection(st, cm, 12);
   const last = rows[rows.length - 1];
   const neg = rows.filter((r) => r.saldo < 0);
-  const s = M.planSplit(st, cm);
-  const pct = (v) => (s.renda > 0 ? `${Math.round((v / s.renda) * 100)}%` : '');
-  // os grupos do plano são as partes da renda: a mesma cor na barra e na linha do grupo
-  const groups = [
-    { id: 'receita', cls: 'in', name: 'Renda', v: s.renda, items: plan.filter((l) => l.kind === 'receita') },
-    { id: 'fixas', cls: 'p-fixas', name: 'Contas fixas', v: s.fixas, items: plan.filter((l) => l.kind === 'despesa' && l.type !== 'verba' && l.rec === 'mensal') },
-    { id: 'verbas', cls: 'p-verbas', name: 'Dia a dia', v: s.verbas, items: plan.filter((l) => l.kind === 'despesa' && l.type === 'verba') },
-    { id: 'anuais', cls: 'p-anuais', name: 'Anuais e parcelas', v: s.anuais, sub: 'separe esse valor todo mês', items: plan.filter((l) => l.kind === 'despesa' && l.type !== 'verba' && l.rec !== 'mensal') },
-    { id: 'guardar', cls: 'p-guardar', name: 'Guardar', v: s.guardar, items: plan.filter((l) => l.kind === 'invest') },
-  ].filter((g) => g.items.length);
-  const groupHTML = (gr) => {
-    const open = ctx.ui.planOpen.has(gr.id);
-    return `<div class="pg${open ? ' open' : ''}">
-      <button class="pg-head" data-act="plan-group" data-id="${gr.id}" aria-expanded="${open}">
-        <i class="sw ${gr.cls}"></i><span class="pg-txt"><b>${gr.name}</b><small>${gr.sub || U.plural(gr.items.length, 'item', 'itens')}</small></span>
-        <span class="pg-amt">${m0(gr.v)}${gr.id === 'receita' ? '' : `<small>${pct(gr.v)}</small>`}</span><span class="chev ${open ? 'up' : ''}">${IC.right}</span>
-      </button>
-      ${open ? `<ul class="pl-list">${M.planOrder(gr.items, cm).map((l) => planItemHTML(l, cm)).join('')}</ul>` : ''}
-    </div>`;
-  };
-  const parts = [...groups.filter((g) => g.id !== 'receita').map((g) => ({ cls: g.cls, name: g.name, v: g.v })), { cls: 'p-sobra', name: 'Sobra livre', v: Math.max(0, s.sobra) }];
-  const sobraRow = `<div class="pg pg-static"><div class="pg-head"><i class="sw p-sobra"></i><span class="pg-txt"><b>${s.sobra < 0 ? 'Falta' : 'Sobra livre'}</b></span><span class="pg-amt ${s.sobra < 0 ? 'neg' : ''}">${m0(Math.abs(s.sobra))}<small>${s.sobra < 0 ? '' : pct(s.sobra)}</small></span><span class="chev-space"></span></div></div>`;
   const redMonths = neg.length > 4 ? `${neg.slice(0, 3).map((r) => U.monthShortYear(r.mk)).join(', ')} e mais ${neg.length - 3}` : U.listPT(neg.map((r) => U.monthShortYear(r.mk)));
   const redText = neg.length
     ? `<span class="flag-ic crit">!</span><span>${esc(redMonths)} ${neg.length === 1 ? 'fecha' : 'fecham'} no vermelho. Toque no mês para ver o porquê.</span>`
@@ -636,12 +680,7 @@ export function planHTML() {
       <div class="chart-box" data-chart="plan"></div>
       <div class="m-detail" data-month-detail aria-live="polite"></div>
     </section>
-    <section class="card ${reveal()}">
-      <div class="card-head"><h2>Itens do plano</h2><button class="btn small lime" data-act="line-new">${IC.plus}Adicionar</button></div>
-      <p class="eyebrow pg-eyebrow">Média por mês</p>
-      ${splitBarHTML(parts, 'Para onde vai a renda, média por mês')}
-      <div class="pg-list">${groups.map(groupHTML).join('')}${sobraRow}</div>
-    </section>
+    ${planItemsHTML(st, cm, rows, reveal())}
     ${planCheckHTML(st, cm)}
     <details class="card table-card ${reveal()}" data-keep="planTable" ${ctx.ui.planTable ? 'open' : ''}>
       <summary><span class="pg-txt"><b>Tabela mês a mês</b><small>Como na planilha: entra, sai, sobra e acumulado</small></span><span class="chev">${IC.right}</span></summary>
@@ -823,7 +862,7 @@ export function mountChart(box, rows, { panel = null, initial = 0, onSelect = nu
   };
   svgEl.addEventListener('pointerover', (e) => {
     const h = e.target.closest('.c-hit');
-    if (h && (!panel || e.pointerType === 'mouse')) show(+h.dataset.tip);
+    if (h && !panel) show(+h.dataset.tip);
   });
   svgEl.addEventListener('click', (e) => {
     const h = e.target.closest('.c-hit');
@@ -841,11 +880,15 @@ export function mountCharts(root) {
     if (kind === 'home') mountChart(box, M.projection(S(), curMk(), 6));
     else if (kind === 'plan') {
       const rows = M.projection(S(), curMk(), 12);
-      const firstNeg = rows.findIndex((r) => r.saldo < 0);
       mountChart(box, rows, {
         panel: root.querySelector('[data-month-detail]'),
-        initial: ctx.ui.planSel ?? Math.max(0, firstNeg),
-        onSelect: (i) => (ctx.ui.planSel = i),
+        initial: planSelIndex(rows),
+        // a lista dos itens segue o mês escolhido
+        onSelect: (i) => {
+          const same = planSelIndex(rows) === i;
+          ctx.ui.planSel = i;
+          if (!same) refreshPlanItems();
+        },
       });
     } else if (box._rows) mountChart(box, box._rows);
   }

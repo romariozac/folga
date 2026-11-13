@@ -187,11 +187,20 @@ document.addEventListener('click', (e) => {
       render();
       break;
     case 'line-new':
-      SH.openLineEditor(null, d.kind ? { kind: d.kind } : {});
+      // com um mês escolhido na aba Plano, o item novo já começa nele
+      SH.openLineEditor(null, { ...(d.kind ? { kind: d.kind } : {}), ...(d.start ? { start: d.start } : {}) }, { mk: d.start || null });
       break;
     case 'line-open': {
+      // aberto pela lista de um mês (aba Plano): mudar o valor pode valer só daquele mês em diante
       const line = A.lineById(d.line);
-      if (line) SH.openLineEditor(line);
+      if (line) SH.openLineEditor(line, {}, { mk: d.mk || null });
+      break;
+    }
+    case 'plan-scope': {
+      ctx.ui.planAll = d.v === 'todos';
+      V.refreshPlanItems();
+      const btn = $(`[data-act="plan-scope"][data-v="${d.v}"]`);
+      if (btn) btn.focus({ preventScroll: true });
       break;
     }
     case 'reserve-edit':

@@ -2665,6 +2665,14 @@ textarea {
 .line-form[data-type='verba'] [data-only-conta] {
   display: none;
 }
+/* “Termina em” vale para todo mês e para meses do ano */
+.line-form[data-rec='anual'] [data-end-field] {
+  display: grid;
+}
+/* aberto pela lista de um mês: o valor novo vale daquele mês em diante ou em todos os meses */
+.line-form [data-split][hidden] {
+  display: none;
+}
 
 /* acerto e check-in */
 .catchup {
@@ -4314,6 +4322,13 @@ details.tech code {
 }
 .pg-eyebrow {
   margin: 10px 0 0;
+}
+/* aba Plano: itens do mês escolhido no gráfico ou todos */
+.pl-scope {
+  margin: 12px 0 2px;
+}
+.pl-none {
+  margin: 14px 0 4px;
 }
 /* Início: quanto já foi gasto do previsto (o resto do mês fica na aba Mês) */
 .month-card .eyebrow + .hero-label {
