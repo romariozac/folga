@@ -43,17 +43,29 @@ export function topbarHTML() {
 }
 
 // ---------- início ----------
-/** O mês num olhar: a sobra prevista e quanto já foi gasto do previsto. O detalhe (previsto x realizado) fica na aba Mês. */
-function monthCardHTML(c, hasPlan) {
-  const hero = hasPlan ? c.saldoExp : c.saldoReal;
+/** O que sobrou (ou faltou) do mês anterior e já está somado no saldo deste mês. Vazio se não sobrou nem faltou. */
+export function carryNote(carry, mk) {
+  if (Math.abs(carry) < 100) return '';
+  const prevName = U.monthName(U.addMonths(mk, -1));
+  return carry > 0 ? `Já conta os ${m0(carry)} que sobraram de ${prevName}.` : `Já conta os ${m0(-carry)} que faltaram em ${prevName}.`;
+}
+
+/**
+ * O mês num olhar: o saldo previsto para o fim do mês (com o que sobrou ou faltou do mês anterior, como o saldo
+ * final da aba Mês) e quanto já foi gasto do previsto. O detalhe (previsto x realizado) fica na aba Mês.
+ */
+function monthCardHTML(c, hasPlan, carry) {
+  const hero = carry + (hasPlan ? c.saldoExp : c.saldoReal);
+  const note = carryNote(carry, c.mk);
   const spent = c.real.despesa;
   const prev = c.prev.despesa;
   const pct = prev ? Math.round((spent / prev) * 100) : 0;
   const over = prev > 0 && spent > prev;
   return `<section class="card month-card ${reveal()}">
     <p class="eyebrow">${U.cap(U.monthName(c.mk))}</p>
-    <p class="hero-label">${hasPlan ? 'Sobra prevista no fim do mês' : 'Saldo do mês até agora'}</p>
+    <p class="hero-label">${hasPlan ? 'Sobra prevista no fim do mês' : 'Saldo até agora'}</p>
     <p class="hero ${hero < 0 ? 'neg' : ''}">${heroMoney(hero)}</p>
+    ${note ? `<p class="hero-note">${note}</p>` : ''}
     ${hasPlan && hero < 0 ? '<p class="hero-sub"><span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho.</p>' : ''}
     ${
       prev
@@ -207,7 +219,7 @@ export function homeHTML() {
   const name = st.core.settings.name;
   let h = `<section class="hello ${reveal()}"><p class="eyebrow">${U.longDate(today())}</p><h1>${greeting()}${name ? `, ${esc(name)}` : ''}</h1></section>`;
   if (!hasPlan) h += planCTAHTML();
-  h += monthCardHTML(c, hasPlan);
+  h += monthCardHTML(c, hasPlan, M.carryIn(st, c.mk));
   // um aviso por vez: a volta depois de uma pausa, a hora de importar ou o check-in da semana
   if (gap !== null && gap >= 2) h += comebackHTML(gap);
   else if (importDue()) h += importCardHTML();
@@ -312,6 +324,28 @@ function doubleHTML(st, mk, cm) {
   </section>`;
 }
 
+/**
+ * Aviso embaixo do previsto x realizado: quanto já passou do planejado nas despesas e onde (o previsto não muda).
+ * No mês atual, diz também onde o mês deve fechar contando isso: o mesmo número do Início.
+ */
+function overNoteHTML(st, c, carry, isCur) {
+  if (!c.lines.length) return '';
+  const overs = Object.values(c.byCat)
+    .filter((b) => b.kind === 'despesa' && b.real - b.prev >= 100)
+    .map((b) => ({ b, v: b.real - b.prev }))
+    .sort((x, y) => y.v - x.v);
+  if (!overs.length) return '';
+  const total = U.sum(overs, (o) => o.v);
+  const names = overs.slice(0, 3).map(({ b, v }) => `${esc(M.catById(st, b.id).name)} (+${m0(v)}${b.prev ? '' : ', fora do plano'})`);
+  const more = overs.length - names.length;
+  const where = more ? `${names.join(', ')} e mais ${U.plural(more, 'categoria', 'categorias')}` : U.listPT(names);
+  const end = carry + c.saldoExp;
+  return `<div class="over-note" role="note">
+    <span class="flag-ic crit">!</span>
+    <p><b>Você ${isCur ? 'já passou' : 'passou'} ${m0(total)} do planejado</b> em ${where}.${isCur ? ` Contando isso, o mês deve fechar em <b class="${end < 0 ? 'neg' : ''}">${m0(end)}</b>, como no Início.` : ''}</p>
+  </div>`;
+}
+
 export function monthHTML() {
   rv = 0;
   const st = S();
@@ -389,6 +423,7 @@ export function monthHTML() {
         </tbody>
         <tfoot><tr><th>Saldo final</th><td class="${neg(carry + c.saldoPrev)}">${m0(carry + c.saldoPrev)}</td><td class="${future ? '' : neg(carry + c.saldoReal)}"><b>${future ? '—' : m0(carry + c.saldoReal)}</b></td></tr></tfoot>
       </table>
+      ${future ? '' : overNoteHTML(st, c, carry, isCur)}
     </section>
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Gastos por categoria</h2></div>
