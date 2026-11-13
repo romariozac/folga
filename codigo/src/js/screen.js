@@ -4,7 +4,7 @@
 // se o dinheiro entrou ou saiu pelo sinal, pela cor do valor e pelas palavras.
 import * as U from './util.js';
 import { norm } from './model.js';
-import { parseDate, bankCatToId } from './importer.js';
+import { parseDate, bankCatToId, DECLINED, REFUND, STATUS_TXT } from './importer.js';
 
 /** Conserta o que o OCR costuma errar em valores: "RS 45,90", "R$45.90", "1.234 ,56", "1O,00". */
 export function fixOcrText(t) {
@@ -69,10 +69,15 @@ function median(arr, dflt) {
 
 /** Palavras → linhas visuais (pela altura do centro de cada palavra). */
 export function toRows(words) {
-  const ws = words
+  const all = words
     .filter((w) => w && w.t && /[\p{L}\p{N}$+-]/u.test(w.t))
     .map((w) => ({ ...w, t: String(w.t), cy: (w.y0 + w.y1) / 2, h: Math.max(1, w.y1 - w.y0) }))
     .sort((a, b) => a.cy - b.cy);
+  // sinal solto e baixinho ("-", "+", "·" lido como traço): não abre linha; entra na linha em que está.
+  // Sem isso ele separava a mesma linha em duas ("Compra - estorno" e "cancelada") ou perdia o "-" de um valor.
+  const medH = median(all.filter((w) => /[\p{L}\p{N}]/u.test(w.t)).map((w) => w.h), 20);
+  const tiny = (w) => !/[\p{L}\p{N}]/u.test(w.t) && w.h < 0.45 * medH;
+  const ws = all.filter((w) => !tiny(w));
   const rows = [];
   for (const w of ws) {
     const r = rows[rows.length - 1];
@@ -85,6 +90,13 @@ export function toRows(words) {
       r.y1 = Math.max(r.y1, w.y1);
     } else rows.push({ words: [w], cy: w.cy, y0: w.y0, y1: w.y1, h: w.h });
   }
+  for (const w of all.filter(tiny)) {
+    let best = null;
+    for (const r of rows) if (w.cy >= r.y0 - 2 && w.cy <= r.y1 + 2 && (!best || Math.abs(r.cy - w.cy) < Math.abs(best.cy - w.cy))) best = r;
+    if (best) best.words.push(w);
+    else rows.push({ words: [w], cy: w.cy, y0: w.y0, y1: w.y1, h: w.h });
+  }
+  rows.sort((a, b) => a.cy - b.cy);
   for (const r of rows) {
     r.words.sort((a, b) => a.x0 - b.x0);
     r.text = r.words.map((w) => w.t).join(' ');
@@ -267,13 +279,16 @@ export function parseScreens(pages) {
         const pushItem = (descRows, a, amt) => {
           let bankCat = '';
           const parts = [];
+          // status da compra: escrito no item ("Negada", "Compra recusada") ou numa etiqueta colorida ao lado
+          const said = descRows.map((d) => d.nt).join(' ');
+          const declined = DECLINED.test(said) && !amt.plus && amt.ink !== 'green' && !REFUND.test(said);
           let date = a.lead ? parseDate(a.lead) : null;
           const sd = date ? null : splitDate(descRows.some((d) => d.lead) ? [] : descRows);
           if (sd) date = sd.date;
           const many = descRows.filter((d) => letters(cleanDesc(d)) >= 4).length >= 1;
           for (const d of descRows) {
             if (!date && d.lead) date = parseDate(d.lead);
-            let s = cleanDesc(d);
+            let s = cleanDesc(d).replace(STATUS_TXT, ' ').replace(/\s+/g, ' ').trim();
             if (sd && sd.rows.includes(d)) s = s.replace(/^\S+\s*/, '');
             if (isJunkLine(s) || WALLET.test(norm(s))) continue;
             if (many && /^\p{L}{1,3}$/u.test(s) && letters(s) <= 3 && descRows.length > 1 && d !== a) continue;
@@ -285,7 +300,7 @@ export function parseScreens(pages) {
           }
           const desc = parts.slice(0, 3).join(' ').replace(/\s+/g, ' ').trim();
           if (!desc) return;
-          items.push({ ...base, date, desc, nd: norm(desc), amount: amt.cents, minus: amt.minus, plus: amt.plus, dc: amt.dc, ink: amt.ink, bankCat });
+          items.push({ ...base, date, desc, nd: norm(desc), amount: amt.cents, minus: amt.minus, plus: amt.plus, dc: amt.dc, ink: amt.ink, bankCat, declined });
         };
         const best = (a) => a.amts.find((x) => x.brl || x.minus || x.plus || x.dc) || a.amts[a.amts.length - 1];
         // valor em moeda estrangeira + valor em reais no mesmo item ("USD 10,00" e "R$ 52,30"): é um item só
@@ -334,7 +349,8 @@ export function parseScreens(pages) {
   const keep = [];
   const when = (x) => x.date || x.ctxDate || null;
   for (const it of items) {
-    const prev = keep.filter((k) => k.page < it.page && !k.matched && k.amount === it.amount && (k.page === it.page - 1 || (when(k) && when(k) === when(it))));
+    // a mesma compra negada e depois aprovada (mesma loja e valor) são duas: só é repetido quem tem o mesmo status
+    const prev = keep.filter((k) => k.page < it.page && !k.matched && k.amount === it.amount && !!k.declined === !!it.declined && (k.page === it.page - 1 || (when(k) && when(k) === when(it))));
     const twin = prev.find((k) => {
       if (when(k) && when(it) && when(k) !== when(it)) return false;
       const a = new Set(k.nd.split(' ').filter((w) => w.length > 2));
@@ -373,6 +389,8 @@ export function parseScreens(pages) {
     for (const t of ['conta', 'cartao']) saBy[t] = dirFor(t, it) === 'out' ? -it.amount : it.amount;
     const row = { date: it.date, desc: it.desc.slice(0, 80), sa: saBy[type], saBy };
     if (it.bankCat) row.bankCat = it.bankCat;
+    // compra negada ou cancelada pelo banco: não aconteceu (a importação deixa de fora e mostra quais foram)
+    if (it.declined) row.declined = true;
     return row;
   });
   return { rows, type, bank, check, conv: 'neg-out' };

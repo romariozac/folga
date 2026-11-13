@@ -797,7 +797,7 @@ export function skipDouble(key, on = true) {
 }
 
 // ---------- importação ----------
-export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) {
+export function commitImport(items, { replaceAcertos = null, learn = [], dropWrong = [] } = {}) {
   const st = S();
   const g = st.core.game;
   const events = [];
@@ -814,6 +814,17 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
       b.tx = b.tx.filter((t) => t.id !== a.id);
       keys.add('m-' + a.mk);
     }
+  }
+  // compras negadas pelo banco que tinham entrado numa leitura anterior: saem (desfazer devolve)
+  let dropped = 0;
+  for (const w of dropWrong) {
+    const b = st.months[w.mk];
+    const t = b && b.tx.find((x) => x.id === w.id);
+    if (!t) continue;
+    b.tx = b.tx.filter((x) => x !== t);
+    removed.push({ mk: w.mk, t });
+    keys.add('m-' + w.mk);
+    dropped++;
   }
   let count = 0;
   let out = 0;
@@ -886,7 +897,7 @@ export function commitImport(items, { replaceAcertos = null, learn = [] } = {}) 
     for (const k of keys) if (k.startsWith('m-')) checkAllBills(k.slice(2), events);
   }
   store.save([...keys]);
-  return { events, count, out, inn, linked, replaced, undo: { added, removed, prevRules, xp: g.xp - xp0, count, plan: planBefore } };
+  return { events, count, out, inn, linked, replaced, dropped, undo: { added, removed, prevRules, xp: g.xp - xp0, count, plan: planBefore } };
 }
 
 /** Desfaz uma importação: tira os lançamentos que ela criou, devolve os acertos trocados e as regras e o XP. */

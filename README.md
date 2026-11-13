@@ -127,6 +127,12 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
   “Seg, 3 de novembro”), modo escuro, valor em verde como entrada, compra em dólar e prints que se repetem em parte
   (o item que aparece em dois prints entra uma vez só). Dica: print da lista de lançamentos, sem cortar os valores,
   e vários prints de uma vez. Confira datas e valores na revisão.
+- **Compras negadas ficam de fora:** o status ao lado da compra (“Negada”, “Recusada”, “Não autorizada”,
+  “Cancelada”), escrito no item ou numa etiqueta colorida, é lido (a etiqueta, texto branco sobre vermelho, é
+  redesenhada como texto escuro para o OCR conseguir ler). A compra negada não entra: aparece em “Ignorados” com o
+  motivo “Negada pelo banco” (dá para lançar mesmo assim) e a importação diz quais foram. Estorno continua entrando
+  como crédito. Vale também para texto colado e PDF. Se um print já tinha entrado antes com as negadas, ler de novo
+  oferece apagar as que entraram por engano (só as que sobram além das aprovadas iguais; dá para desfazer).
 - **Palpites, sem o Claude:** o que sobrar de dúvida vem com a categoria mais provável destacada, pelo seu histórico
   (“Josefa Araujo Silva” parecido com “Josefa Araujo”), por palavras cortadas (“FARMA ZE” → Farmácia) e pela categoria
   que o banco mostra. O botão **Aceitar meus palpites** resolve de uma vez; você confere na revisão. Pix para pessoas

@@ -385,6 +385,15 @@ function segments(line) {
 }
 
 /** Texto colado ou extraído de PDF: uma transação por linha (data … descrição … valor). */
+/**
+ * Compra que não aconteceu: o banco negou, recusou, não autorizou ou cancelou. Vale para o texto já sem acentos
+ * (norm). Não vale para crédito (estorno, devolução): esse dinheiro voltou de verdade.
+ */
+export const DECLINED = /\b(negad[ao]s?|recusad[ao]s?|nao (foi )?(autorizad|aprovad|concluid|realizad|efetuad)[ao]s?|reprovad[ao]s?|cancelad[ao]s?|desfeit[ao]s?|transacao invalida)\b/;
+export const REFUND = /\b(estorno|estornad[ao]|devolucao|devolvid[ao]|reembolso|cashback|credito)\b/;
+/** Palavras de status que não fazem parte do nome da loja (tiradas da descrição). */
+export const STATUS_TXT = /(^|\s)(?:(?:compra|transa[çc][ãa]o|opera[çc][ãa]o|pagamento)\s+)?(?:n[ãa]o\s+(?:foi\s+)?(?:autorizad|aprovad|conclu[íi]d|realizad|efetuad)[ao]s?|negad[ao]s?|recusad[ao]s?|reprovad[ao]s?|cancelad[ao]s?|desfeit[ao]s?|pendentes?|aprovad[ao]s?|autorizad[ao]s?|confirmad[ao]s?|processando|em\s+processamento|em\s+an[áa]lise|conclu[íi]d[ao]s?)(?=\s|$|[.,;:)])/gi;
+
 export function parseText(text, typeHint = null, hints = null) {
   const type = typeHint || (/fatura|limite (total|dispon)|pagamento m[ií]nimo|cart[aã]o de cr[eé]dito/i.test(text) ? 'cartao' : 'conta');
   const rows = [];
@@ -432,6 +441,12 @@ export function parseText(text, typeHint = null, hints = null) {
       const sa = parseAmount(pick[0]);
       if (date && sa) {
         const row = { date, desc, sa };
+        // compra negada ou cancelada pelo banco: não aconteceu (a importação deixa de fora e mostra quais foram)
+        const nline = norm(line);
+        if (DECLINED.test(nline) && !REFUND.test(nline)) {
+          row.declined = true;
+          row.desc = desc.replace(STATUS_TXT, ' ').replace(/\s+/g, ' ').trim() || desc;
+        }
         const hint = hints && hints.get(hintKey(`${dm[1]} ${desc} ${pick[0].trim()}`));
         if (hint) row.bankCat = hint;
         rows.push(row);
@@ -645,6 +660,7 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
     const it = { date: r.date, desc, amount, dir: out ? 'out' : 'in', key, fp, nd, kind: out ? 'despesa' : 'receita', cat: null, how: '', status: 'add', reason: '', parc: !!r.parc, moved: !!r.moved };
 
     // 1) o que não deve virar lançamento
+    if (r.declined) return { ...it, status: 'ignore', reason: 'Negada pelo banco', declined: true };
     if (fps.has(fp)) return { ...it, status: 'dup', reason: 'Já importado antes' };
     const again = imported.find((t) => !t.used && t.d === r.date && Math.abs(t.v) === amount && sameDesc(t.n, desc));
     if (again) {
@@ -683,6 +699,28 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
     q.guess = bestGuess(ranked);
     return q;
   });
+
+  // compra negada que já tinha entrado numa leitura anterior (antes de o app entender o status): dá para apagar.
+  // Só conta como errada a que sobra além das aprovadas iguais (mesma loja, valor e dia) desta leitura.
+  const sameTx = (t, it) => t.fp === it.fp || (t.d === it.date && Math.abs(t.v) === it.amount && sameDesc(t.n, it.desc));
+  const taken = new Set();
+  const seenFp = new Set();
+  for (const it of items) {
+    if (!it.declined || seenFp.has(it.fp)) continue;
+    seenFp.add(it.fp);
+    const twins = items.filter((x) => x.declined && x.fp === it.fp);
+    const olds = imported.filter((t) => !taken.has(t.id) && sameTx(t, it));
+    const approved = items.filter((x) => !x.declined && x.fp === it.fp).length;
+    const n = Math.min(twins.length, Math.max(0, olds.length - approved));
+    for (let k = 0; k < twins.length; k++) {
+      twins[k].wrong = null;
+      if (k < n) {
+        const t = olds[olds.length - 1 - k];
+        taken.add(t.id);
+        twins[k].wrong = { mk: t.mk, id: t.id };
+      }
+    }
+  }
 
   // 4) já lançado à mão (mesmo valor, até 3 dias de diferença): não lança de novo. Aparece na conciliação,
   // onde dá para dizer que não é o mesmo. Contas do plano já marcadas ficam para o passo 5.
