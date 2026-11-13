@@ -550,19 +550,26 @@ export function closeOpen(S, mk) {
   return g - sum(rec.parts, (p) => p.v);
 }
 
-/** Projeção mês a mês (o coração da planilha do Cerbasi: tudo que vai entrar e sair). */
-export function projection(S, fromMk, n = 12) {
+/**
+ * Projeção mês a mês (o coração da planilha do Cerbasi: tudo que vai entrar e sair).
+ * real: parte de onde a pessoa está, como a aba Mês e o Início: o acumulado começa no saldo que veio do mês
+ * anterior e o mês atual conta o que já passou do planejado (realizado ou previsto, o que for maior). Assim o
+ * acumulado de um mês é o saldo final dele na aba Mês, e o de um mês é o saldo anterior (start) do seguinte.
+ */
+export function projection(S, fromMk, n = 12, { real = false } = {}) {
   const rows = [];
   const out = restsOut(S);
-  let acc = 0;
+  const cm = isoDate().slice(0, 7);
+  let acc = real ? carryIn(S, fromMk) : 0;
   for (let i = 0; i < n; i++) {
     const mk = addMonths(fromMk, i);
-    const r = { mk, receita: 0, despesa: 0, invest: 0, extras: [] };
+    const r = { mk, receita: 0, despesa: 0, invest: 0, extras: [], start: acc };
     for (const l of S.core.plan) {
       if (!occurs(l, mk)) continue;
       r[l.kind] += amountIn(l, mk, out);
       if (l.rec !== 'mensal' && l.kind === 'despesa') r.extras.push(l);
     }
+    if (real && mk === cm) Object.assign(r, monthCalc(S, mk).exp);
     r.saldo = r.receita - r.despesa - r.invest;
     acc += r.saldo;
     r.acc = acc;

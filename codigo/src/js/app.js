@@ -196,6 +196,21 @@ document.addEventListener('click', (e) => {
       if (line) SH.openLineEditor(line, {}, { mk: d.mk || null });
       break;
     }
+    case 'plan-prev': {
+      // de onde veio o saldo anterior: o mês anterior no gráfico; antes do primeiro, a aba Mês do mês passado
+      const i = +d.i;
+      const hit = i > 0 && $(`.c-hit[data-tip="${i - 1}"]`);
+      if (hit) {
+        hit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        const b = $('[data-act="plan-prev"]');
+        if (b) b.focus({ preventScroll: true });
+      } else {
+        setTab('mes');
+        ctx.ui.mk = U.addMonths(curMk(), -1);
+        render();
+      }
+      break;
+    }
     case 'plan-scope': {
       ctx.ui.planAll = d.v === 'todos';
       V.refreshPlanItems();
