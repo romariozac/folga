@@ -7,7 +7,7 @@ export const ctx = {
     tab: 'inicio',
     mk: mkOf(isoDate()), // mês aberto na aba "Mês"
     animate: true,
-    billsExpanded: false,
+    openBills: new Set(), // Início, contas do mês: partes abertas ('receita', 'despesa', 'invest'); começam fechadas
     openCats: new Set(), // grupos abertos no detalhe da aba Mês
     openFlows: new Set(), // aba Mês, lançamentos: partes abertas ('receita', 'despesa', 'invest'); começam fechadas
     txFilter: null, // aba Mês: lançamentos só de uma categoria { id, sub } (sub: só aquele item, sem o resto do grupo)

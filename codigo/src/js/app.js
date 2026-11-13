@@ -119,13 +119,14 @@ document.addEventListener('click', (e) => {
       render();
       break;
     }
-    case 'flow-toggle': {
-      // lançamentos da aba Mês: abre ou fecha entradas, despesas ou investimento
-      const set = ctx.ui.openFlows;
+    case 'flow-toggle':
+    case 'bills-toggle': {
+      // lançamentos da aba Mês (entradas, despesas, investimento) ou contas do Início (a receber, a pagar, a guardar)
+      const set = act === 'flow-toggle' ? ctx.ui.openFlows : ctx.ui.openBills;
       if (set.has(d.k)) set.delete(d.k);
       else set.add(d.k);
       render();
-      const btn = $(`[data-act="flow-toggle"][data-k="${d.k}"]`);
+      const btn = $(`[data-act="${act}"][data-k="${d.k}"]`);
       if (btn) btn.focus({ preventScroll: true });
       break;
     }
@@ -161,10 +162,6 @@ document.addEventListener('click', (e) => {
       break;
     case 'bill-open':
       SH.openBill(d.line, d.mk);
-      break;
-    case 'bills-expand':
-      ctx.ui.billsExpanded = !ctx.ui.billsExpanded;
-      render();
       break;
     case 'tx-open': {
       // entrada que cobriu o que faltou num mês (parcelamento, reserva): muda-se pela resposta do fechamento

@@ -1092,7 +1092,7 @@ h3 {
 .f-in .flow-amt {
   color: var(--good-text);
 }
-/* lançamentos da aba Mês: a faixa abre e fecha a parte (começa fechada) */
+/* lançamentos da aba Mês e contas do Início: a faixa abre e fecha a parte (começa fechada) */
 .flow-title {
   margin: 0;
   font: inherit;
@@ -1120,8 +1120,45 @@ h3 {
   margin-top: 12px;
   color: var(--ink-2);
 }
-.flow-head + .bills {
+.flow-head + .bills,
+.flow-title + .bills {
   margin-top: 2px;
+}
+/* contas do Início: nome e “faltam / vencidas”; sem espaço, o “faltam” desce para baixo do nome (o valor fica à direita) */
+.flow-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 1px;
+  min-width: 0;
+}
+.flow-name > * {
+  white-space: nowrap;
+}
+/* contas do Início, parte fechada: alguma já venceu (fica à vista mesmo com a parte fechada) */
+.flow-late {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--crit-text);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.flow-late .flag-ic {
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+}
+.flow-ok {
+  display: inline-flex;
+  color: var(--good-text);
+}
+.flow-ok .ic {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.8;
 }
 /* o que entra fica em verde também na lista de contas */
 .bill.k-receita:not(.done) .bill-amt {
