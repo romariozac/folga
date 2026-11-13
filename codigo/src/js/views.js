@@ -160,13 +160,39 @@ const FLOWS = [
   { k: 'invest', cls: 'inv', label: 'Investimento', bill: 'A guardar' },
 ];
 
-/** Contas separadas em “A receber”, “A pagar” e “A guardar”, para não misturar o que entra com o que sai. */
-export function billsByFlowHTML(list, mk, attr = 'data-act') {
+/** Dia em que a conta vence neste mês já passou (só no mês atual, como em “venceu dia 9”). */
+function isLate(line, mk) {
+  return mk === curMk() && !!line.day && Math.min(line.day, U.daysInMonth(mk)) < new Date().getDate();
+}
+
+/** Faixa de uma parte das contas que abre e fecha: quantas faltam, quanto e se alguma já venceu. */
+function billsFlowTitle(f, items, mk, open) {
+  const pend = items.filter((b) => !b.tx);
+  const n = pend.length;
+  const left = U.sum(pend, (b) => b.line.amount);
+  const late = f.k === 'despesa' ? pend.filter((b) => isLate(b.line, mk)).length : 0;
+  const allDone = { receita: 'tudo recebido', despesa: 'tudo pago', invest: 'tudo guardado' }[f.k];
+  const amt = n ? `${f.k === 'receita' ? '+' : ''}${m0(left)}` : '';
+  const lateTxt = late ? `${late} ${late === 1 ? 'vencida' : 'vencidas'}` : '';
+  const say = [n ? `${n === 1 ? 'falta' : 'faltam'} ${n}, ${amt}` : allDone, lateTxt].filter(Boolean).join(', ');
+  return `<h3 class="flow-title"><button class="flow-head flow-btn" data-act="bills-toggle" data-k="${f.k}" aria-expanded="${open}" aria-label="${f.bill}: ${say}. ${open ? 'Fechar' : 'Abrir'}">
+    <i class="sw ${f.cls}"></i><span class="flow-name"><b>${f.bill}</b><small>${n ? `${n === 1 ? 'falta' : 'faltam'} ${n}` : allDone}</small>${lateTxt ? `<span class="flow-late"><span class="flag-ic crit">!</span>${lateTxt}</span>` : ''}</span><span class="flow-amt">${n ? amt : `<span class="flow-ok">${IC.check}</span>`}</span><span class="chev ${open ? 'up' : ''}">${IC.right}</span>
+  </button></h3>`;
+}
+
+/**
+ * Contas separadas em “A receber”, “A pagar” e “A guardar”, para não misturar o que entra com o que sai.
+ * No Início (fold), cada parte começa fechada, como os lançamentos da aba Mês, e abre ao tocar na faixa.
+ */
+export function billsByFlowHTML(list, mk, attr = 'data-act', fold = false) {
   return FLOWS.map((f) => {
     const items = list.filter((b) => b.line.kind === f.k);
     if (!items.length) return '';
+    const open = !fold || ctx.ui.openBills.has(f.k);
+    const title = fold ? billsFlowTitle(f, items, mk, open) : `<h3 class="flow-head"><i class="sw ${f.cls}"></i><b>${f.bill}</b></h3>`;
+    if (!open) return `<div class="flow f-${f.cls} shut">${title}</div>`;
     return `<div class="flow f-${f.cls}">
-      <h3 class="flow-head"><i class="sw ${f.cls}"></i><b>${f.bill}</b></h3>
+      ${title}
       <ul class="bills">${items.map((b) => billRowHTML(b, mk, attr)).join('')}</ul>
     </div>`;
   }).join('');
@@ -174,12 +200,9 @@ export function billsByFlowHTML(list, mk, attr = 'data-act') {
 
 function billsHTML(c) {
   const done = c.bills.filter((b) => b.tx).length;
-  const exp = ctx.ui.billsExpanded;
-  const list = exp ? c.bills : c.bills.slice(0, 5);
   return `<section class="card ${reveal()}">
     <div class="card-head"><h2>Contas do mês</h2><span class="pill">${done} de ${c.bills.length}</span></div>
-    ${billsByFlowHTML(list, c.mk)}
-    ${c.bills.length > 5 ? `<button class="link more" data-act="bills-expand">${exp ? 'Mostrar menos' : `Ver todas (${c.bills.length})`}</button>` : ''}
+    ${billsByFlowHTML(c.bills, c.mk, 'data-act', true)}
   </section>`;
 }
 

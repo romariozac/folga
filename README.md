@@ -51,7 +51,9 @@ projeção e aparece em “Contas do mês” até o prazo: um toque em **Guardei
 
 1. **Lançar leva 2 toques.** O app abre num teclado numérico: digite o valor e toque na categoria. Salva na hora.
 2. **As contas fixas já vêm do plano.** Aluguel, condomínio, plano de saúde, salário etc. aparecem na lista
-   “Contas do mês”; um toque em *Paguei* / *Recebi* / *Guardei* e pronto. Você não digita nada disso.
+   “Contas do mês”; um toque em *Paguei* / *Recebi* / *Guardei* e pronto. Você não digita nada disso. No Início, a
+   lista vem fechada em *A receber*, *A pagar* e *A guardar*, cada parte com quantas faltam, quanto e se alguma já
+   venceu (ex.: *A pagar · faltam 4 · 2 vencidas · R$ 1.960*); tocar na faixa abre ou fecha.
 3. **Ficou dias sem lançar? Sem culpa.** O app mostra “6 dias sem lançar? Tudo bem” e oferece um **acerto
    rápido**: um total aproximado por categoria (olhando o app do banco). Ou só “seguir daqui”.
 4. **Voltar dá prêmio, não bronca.** Voltar depois de uma pausa vale +30 XP e a medalha 🪃 “De volta ao jogo”.
