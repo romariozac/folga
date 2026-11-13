@@ -544,6 +544,41 @@ h3 {
 .hero-sub .flag-ic {
   margin-top: 1px;
 }
+/* Início: o saldo já soma o que sobrou (ou faltou) do mês anterior; a linha diz quanto */
+.hero-note {
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+.hero-note + .hero-sub {
+  margin-top: 4px;
+}
+/* aba Mês: quanto já passou do planejado (o previsto continua o do plano) */
+.over-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(208, 59, 59, 0.08);
+  background: color-mix(in oklab, var(--crit) 10%, transparent);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.over-note .flag-ic {
+  margin-top: 2px;
+}
+.over-note p {
+  margin: 0;
+}
+.over-note b {
+  color: var(--ink);
+}
+.over-note b.neg {
+  color: var(--crit-text);
+}
 .tiles {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2499,6 +2534,12 @@ textarea {
 }
 .ck-proj b.neg {
   color: var(--crit-text);
+}
+.ck-proj small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
 }
 .quote {
   margin: 4px 0;

@@ -6,7 +6,7 @@ import * as G from './game.js';
 import * as A from './actions.js';
 import { store } from './store.js';
 import { IC, $, $$, openSheet, closeSheet, sheetHead, confirmDialog, toast, vibrate } from './ui.js';
-import { legendHTML, mountChart, billsByFlowHTML } from './views.js';
+import { legendHTML, mountChart, billsByFlowHTML, carryNote } from './views.js';
 import { catBrowserHTML, catPickerHTML, catPickerClick, createFromSearch, openCategories } from './catui.js';
 import { openImport } from './importui.js';
 
@@ -516,6 +516,13 @@ export function openCatchUp() {
 }
 
 // =============== CHECK-IN SEMANAL ===============
+/** Check-in: o saldo previsto para o fim do mês, igual ao do Início (com o que sobrou ou faltou do mês anterior). */
+function ckProjHTML(c, carry) {
+  const end = carry + c.saldoExp;
+  const note = carryNote(carry, c.mk);
+  return `<div class="ck-proj"><span>Previsão de sobra no fim do mês${note ? `<small>${note}</small>` : ''}</span><b class="${end < 0 ? 'neg' : ''}">${money(end)}</b></div>`;
+}
+
 export function openCheckin() {
   let step = 0;
   const steps = ['Contas', 'O que faltou', 'O mês'];
@@ -570,7 +577,7 @@ export function openCheckin() {
             .join('');
           body = `<p class="card-sub">O mês está <b>${pctMonth}%</b> concluído. Nas barras abaixo, o traço marca esse ritmo: barra antes do traço = tudo sob controle.</p>
             ${rows ? `<ul class="bullets">${rows}</ul>` : '<p class="card-sub">Defina verbas do dia a dia no plano para acompanhar o ritmo aqui.</p>'}
-            ${st.core.plan.length ? `<div class="ck-proj"><span>Previsão de sobra no fim do mês</span><b class="${c.saldoExp < 0 ? 'neg' : ''}">${money(c.saldoExp)}</b></div>` : ''}
+            ${st.core.plan.length ? ckProjHTML(c, M.carryIn(st, mk)) : ''}
             <blockquote class="quote">“${esc(tip.t)}”<cite>${esc(tip.s)}</cite></blockquote>
             <div class="row-btns stick"><button type="button" class="btn lime wide" data-finish>Concluir check-in · +50 XP</button></div>`;
         }
