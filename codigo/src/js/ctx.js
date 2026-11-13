@@ -9,6 +9,7 @@ export const ctx = {
     animate: true,
     billsExpanded: false,
     openCats: new Set(), // grupos abertos no detalhe da aba Mês
+    openFlows: new Set(), // aba Mês, lançamentos: partes abertas ('receita', 'despesa', 'invest'); começam fechadas
     txFilter: null, // aba Mês: lançamentos só de uma categoria { id, sub } (sub: só aquele item, sem o resto do grupo)
     planOpen: new Set(), // grupos abertos em "Itens do plano"
     planCheck: false, // "Conferir o plano" aberto

@@ -231,19 +231,29 @@ function txFilterHTML(st, f) {
   </div>`;
 }
 
-/** Lançamentos separados em entradas, despesas e investimento; dentro de cada parte, por dia (o mais novo primeiro). */
-function txsByFlowHTML(txs, mk) {
+/**
+ * Lançamentos separados em entradas, despesas e investimento; dentro de cada parte, por dia (o mais novo primeiro).
+ * Cada parte começa fechada (só a faixa com quantos são e o total) e abre ao tocar na faixa. Filtrado por
+ * categoria (fold = false), vem tudo aberto: a lista já é curta e foi pedida.
+ */
+function txsByFlowHTML(txs, mk, fold = true) {
   return FLOWS.map((fl) => {
     const list = txs.filter((t) => t.k === fl.k);
     if (!list.length) return '';
     const total = U.sum(list, (t) => t.v);
     // despesas saem (−), entradas entram (+); estornos podem deixar o total das despesas a favor
     const sign = fl.k === 'receita' ? '+' : fl.k === 'despesa' ? (total < 0 ? '+' : '−') : '';
+    const open = !fold || ctx.ui.openFlows.has(fl.k);
+    const head = `<i class="sw ${fl.cls}"></i><b>${fl.label}</b><small>${list.length}</small><span class="flow-amt">${sign}${money(Math.abs(total))}</span>`;
+    const title = fold
+      ? `<h3 class="flow-title"><button class="flow-head flow-btn" data-act="flow-toggle" data-k="${fl.k}" aria-expanded="${open}" aria-label="${fl.label}: ${list.length} ${list.length === 1 ? 'lançamento' : 'lançamentos'}, ${sign}${money(Math.abs(total))}. ${open ? 'Fechar' : 'Abrir'}">${head}<span class="chev ${open ? 'up' : ''}">${IC.right}</span></button></h3>`
+      : `<h3 class="flow-head">${head}</h3>`;
+    if (!open) return `<div class="flow f-${fl.cls} shut">${title}</div>`;
     const byDay = {};
     for (const t of list) (byDay[t.d] ||= []).push({ ...t, mk });
     const days = Object.keys(byDay).sort().reverse();
     return `<div class="flow f-${fl.cls}">
-      <h3 class="flow-head"><i class="sw ${fl.cls}"></i><b>${fl.label}</b><small>${list.length}</small><span class="flow-amt">${sign}${money(Math.abs(total))}</span></h3>
+      ${title}
       ${days.map((d) => `<h4 class="day">${U.dayLabel(d)}</h4><ul class="txs">${byDay[d].sort((a, b) => (b.t || 0) - (a.t || 0)).map(txRowHTML).join('')}</ul>`).join('')}
     </div>`;
   }).join('');
@@ -388,7 +398,7 @@ export function monthHTML() {
     <section class="card ${reveal()}" id="lancamentos">
       <div class="card-head"><h2>Lançamentos</h2><span class="pill">${f ? `${txs.length} de ${c.txs.length}` : c.txs.length}</span></div>
       ${f ? txFilterHTML(st, f) : ''}
-      ${txs.length ? txsByFlowHTML(txs, mk) : `<div class="empty"><p>${f ? 'Nenhum lançamento desta categoria neste mês.' : 'Nenhum lançamento neste mês.'}</p></div>`}
+      ${txs.length ? txsByFlowHTML(txs, mk, !f) :`<div class="empty"><p>${f ? 'Nenhum lançamento desta categoria neste mês.' : 'Nenhum lançamento neste mês.'}</p></div>`}
     </section>`;
 }
 
