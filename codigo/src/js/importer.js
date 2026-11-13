@@ -688,7 +688,7 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
   // onde dá para dizer que não é o mesmo. Contas do plano já marcadas ficam para o passo 5.
   for (const it of items) {
     if (it.status === 'ignore' || it.status === 'dup' || it.refund) continue;
-    const t = existing.find((x) => !x.used && !x.im && !x.ap && !x.p && x.k === it.kind && x.v === it.amount && Math.abs(U.daysBetween(x.d, it.date)) <= 3);
+    const t = existing.find((x) => !x.used && !x.im && !x.ap && !x.p && !x.cv && x.k === it.kind && x.v === it.amount && Math.abs(U.daysBetween(x.d, it.date)) <= 3);
     if (!t) continue;
     t.used = true;
     it.match = { type: 'tx', tx: t, mk: t.mk, name: t.n || M.catById(S, t.c).name, tier: 'ok' };

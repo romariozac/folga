@@ -186,8 +186,9 @@ function billsHTML(c) {
 export function txRowHTML(t) {
   const cat = M.catById(S(), t.c);
   const refund = t.k === 'despesa' && t.v < 0;
-  const sign = t.k === 'receita' || refund ? '+' : t.k === 'despesa' ? '−' : '';
-  const tags = [t.ap ? 'aproximado' : '', t.im ? 'extrato' : '', t.auto ? 'automático' : '', refund ? 'estorno' : ''].filter(Boolean).join(' · ');
+  const resg = t.k === 'invest' && t.v < 0; // tirou da reserva (ou de um investimento)
+  const sign = t.k === 'receita' || refund ? '+' : t.k === 'despesa' || resg ? '−' : '';
+  const tags = [t.ap ? 'aproximado' : '', t.im ? 'extrato' : '', t.auto ? 'automático' : '', refund ? 'estorno' : '', resg ? 'resgate' : '', t.cv ? 'fechamento do mês' : ''].filter(Boolean).join(' · ');
   return `<li><button class="tx" data-act="tx-open" data-id="${t.id}" data-mk="${t.mk}">
     <span class="emo">${cat.emoji}</span>
     <span class="tx-txt"><b>${esc(t.n || cat.name)}</b><small>${t.n ? esc(cat.name) + ' · ' : ''}${U.dayLabel(t.d)}${tags ? ' · ' + tags : ''}</small></span>
@@ -218,6 +219,71 @@ function importCardHTML() {
   </section>`;
 }
 
+// ---------- fechamento do mês: como foi coberto o que faltou ----------
+/** O mês passado terminou faltando e ainda falta responder como ficou: { mk, open, rec }; senão null. */
+function closeDue(st) {
+  const mk = U.addMonths(curMk(), -1);
+  if (!M.txOf(st, mk).length) return null;
+  const open = M.closeOpen(st, mk);
+  if (open < 100) return null;
+  const z = st.core.settings.closeSnooze;
+  if (z && z.mk === mk && today() < z.until) return null;
+  return { mk, open, rec: M.closeOf(st, mk) };
+}
+
+function closeCardHTML({ mk, open, rec }) {
+  const mes = U.monthName(mk);
+  return `<section class="card note-card close-card ${reveal()}">
+    <span class="note-emo">🧮</span>
+    <div>
+      <h2>${rec ? `${U.cap(mes)}: faltam mais ${m0(open)}` : `${U.cap(mes)} terminou faltando ${m0(open)}`}</h2>
+      <p>${rec ? 'Depois da sua resposta entrou mais coisa no mês. Como ficou o resto?' : 'No banco não existe saldo negativo: o que faltou virou dívida ou saiu da reserva. Como ficou?'}</p>
+      <div class="row-btns"><button class="btn lime" data-act="close-open" data-mk="${mk}">Responder</button><button class="btn ghost" data-act="close-later" data-mk="${mk}">Depois</button></div>
+      <p class="help close-help">Ainda vai importar a fatura ou o extrato de ${mes}? <button class="link small" data-act="import">Importe antes</button></p>
+    </div>
+  </section>`;
+}
+
+/** A resposta em palavras: “no cartão”, “R$ 600 no cartão e R$ 400 da reserva”, “parcelado em 6x de R$ 260”. */
+function closeWords(rec, next) {
+  const H = M.CLOSE_HOW;
+  const one = (p) => (p.how === 'parcelado' ? `parcelado em ${p.n}x de ${m0(p.p)}` : p.how === 'cartao' && p.all ? `no cartão (fatura de ${U.monthName(next)})` : H[p.how].short);
+  if (rec.parts.length === 1) return one(rec.parts[0]);
+  return U.listPT(rec.parts.map((p) => `${m0(p.v)} ${one(p)}`));
+}
+
+/** Aba Mês, mês já fechado: quanto faltou e como ficou (ou o botão para responder). */
+function closeLineHTML(st, mk) {
+  const g = M.shortfall(st, mk);
+  const rec = M.closeOf(st, mk);
+  if (g < 100 && !rec) return '';
+  const mes = U.cap(U.monthName(mk));
+  const open = M.closeOpen(st, mk);
+  const act = `data-act="close-open" data-mk="${mk}"`;
+  if (!rec)
+    return `<div class="close-line" role="note"><span class="cl-ic" aria-hidden="true">🧮</span><p><b>${mes} terminou faltando ${m0(g)}.</b> No banco isso virou dívida ou saiu da reserva.</p><button class="btn small primary" ${act}>Como ficou?</button></div>`;
+  const words = closeWords(rec, U.addMonths(mk, 1));
+  return `<div class="close-line done" role="note"><span class="cl-ic" aria-hidden="true">🧮</span><p>${g >= 100 ? `Faltaram ${m0(g)}: ${words}.` : `Resposta: ${words}.`}${open >= 100 ? ` <b>Faltam mais ${m0(open)} sem resposta.</b>` : ''}</p><button class="link small" ${act}>alterar</button></div>`;
+}
+
+/** Aba Mês: embaixo do saldo anterior negativo, onde ele está (no cartão, no rotativo, no cheque especial). */
+function carryWhyHTML(st, mk, carry) {
+  if (carry > -100) return '';
+  const rec = M.closeOf(st, U.addMonths(mk, -1));
+  if (!rec) return '';
+  const H = M.CLOSE_HOW;
+  const labels = rec.parts.filter((p) => H[p.how].label);
+  if (!labels.length) return '';
+  const txt =
+    labels.length === 1 && labels[0].all
+      ? labels[0].how === 'cartao'
+        ? `No cartão: entra na fatura de ${U.monthName(mk)}`
+        : `${U.cap(H[labels[0].how].short)}, com juros`
+      : labels.map((p) => `${m0(p.v)} ${H[p.how].short}`).join(' · ');
+  // linha própria, embaixo do saldo anterior: não mexe na largura das colunas de valores
+  return `<tr class="carry-why"><td colspan="3">${txt}</td></tr>`;
+}
+
 export function homeHTML() {
   rv = 0;
   const st = S();
@@ -231,7 +297,9 @@ export function homeHTML() {
   if (!hasPlan) h += planCTAHTML();
   h += monthCardHTML(c, hasPlan, M.carryIn(st, c.mk));
   // um aviso por vez: a volta depois de uma pausa, a hora de importar ou o check-in da semana
-  if (gap !== null && gap >= 2) h += comebackHTML(gap);
+  const cd = closeDue(st);
+  if (cd) h += closeCardHTML(cd);
+  else if (gap !== null && gap >= 2) h += comebackHTML(gap);
   else if (importDue()) h += importCardHTML();
   else if (!sk.checkinThisWeek && checkinWindow() && g.lastActive) h += checkinCardHTML();
   if (c.bills.length) h += billsHTML(c);
@@ -264,7 +332,7 @@ function txsByFlowHTML(txs, mk, fold = true) {
     if (!list.length) return '';
     const total = U.sum(list, (t) => t.v);
     // despesas saem (−), entradas entram (+); estornos podem deixar o total das despesas a favor
-    const sign = fl.k === 'receita' ? '+' : fl.k === 'despesa' ? (total < 0 ? '+' : '−') : '';
+    const sign = fl.k === 'receita' ? '+' : fl.k === 'despesa' ? (total < 0 ? '+' : '−') : total < 0 ? '−' : '';
     const open = !fold || ctx.ui.openFlows.has(fl.k);
     const head = `<i class="sw ${fl.cls}"></i><b>${fl.label}</b><small>${list.length}</small><span class="flow-amt">${sign}${money(Math.abs(total))}</span>`;
     const title = fold
@@ -427,13 +495,14 @@ export function monthHTML() {
       <table class="pr-table">
         <thead><tr><th></th><th>Previsto</th><th>Realizado</th></tr></thead>
         <tbody>
-          <tr class="carry"><th>Saldo anterior${future ? '' : ` <button class="link small" data-act="carry-edit" data-mk="${mk}">ajustar</button>`}</th><td class="${neg(carry)}">${m0(carry)}</td><td class="${future ? '' : neg(carry)}">${future ? '—' : m0(carry)}</td></tr>
+          <tr class="carry"><th>Saldo anterior${future ? '' : ` <button class="link small" data-act="carry-edit" data-mk="${mk}">ajustar</button>`}</th><td class="${neg(carry)}">${m0(carry)}</td><td class="${future ? '' : neg(carry)}">${future ? '—' : m0(carry)}</td></tr>${carryWhyHTML(st, mk, carry)}
           ${tr('in', 'Entradas', c.prev.receita, c.real.receita)}${tr('out', 'Despesas', c.prev.despesa, c.real.despesa)}${tr('inv', 'Investimento', c.prev.invest, c.real.invest)}
           <tr class="month-res"><th>Saldo do mês</th><td class="${neg(c.saldoPrev)}">${m0(c.saldoPrev)}</td><td class="${future ? '' : neg(c.saldoReal)}">${future ? '—' : m0(c.saldoReal)}</td></tr>
         </tbody>
         <tfoot><tr><th>Saldo final</th><td class="${neg(carry + c.saldoPrev)}">${m0(carry + c.saldoPrev)}</td><td class="${future ? '' : neg(carry + c.saldoReal)}"><b>${future ? '—' : m0(carry + c.saldoReal)}</b></td></tr></tfoot>
       </table>
       ${future ? '' : overNoteHTML(st, c, carry, isCur)}
+      ${mk < cm ? closeLineHTML(st, mk) : ''}
     </section>
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Gastos por categoria</h2></div>

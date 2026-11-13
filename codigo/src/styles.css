@@ -598,6 +598,118 @@ h3 {
 .hero-note + .hero-sub {
   margin-top: 4px;
 }
+/* fechamento do mês: como foi coberto o que faltou */
+.close-card .close-help {
+  margin-top: 10px;
+  font-size: 13px;
+}
+.close-line {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.close-line p {
+  margin: 0;
+  flex: 1;
+}
+.close-line b {
+  color: var(--ink);
+}
+.close-line .cl-ic {
+  font-size: 18px;
+}
+.close-line .btn {
+  flex: none;
+}
+.pr-table tr.carry:has(+ tr.carry-why) th,
+.pr-table tr.carry:has(+ tr.carry-why) td {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+.pr-table tr.carry-why td {
+  padding-top: 0;
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.cl-opts {
+  display: grid;
+  gap: 8px;
+}
+.cl-opt {
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cl-opt.on {
+  border-color: var(--ink-2);
+}
+.cl-opt .cl-tog {
+  align-items: flex-start;
+  border: 0;
+  border-radius: 0;
+}
+.cl-opt .cl-tog input {
+  margin-top: 2px;
+}
+.cl-emo {
+  font-size: 20px;
+  line-height: 1.1;
+}
+.cl-txt {
+  display: grid;
+  gap: 2px;
+}
+.cl-txt small {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.cl-more {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px 44px;
+}
+.cl-more .help b {
+  color: var(--ink);
+}
+.cl-repor {
+  display: grid;
+  gap: 6px;
+}
+.cl-status {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+.cl-status:empty {
+  display: none;
+}
+.cl-status.warn {
+  color: var(--crit-text);
+}
+.cl-status.done {
+  color: var(--good-text);
+}
+.cl-changed {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.cl-drop {
+  justify-self: center;
+}
 /* aba Mês: quanto já passou do planejado (o previsto continua o do plano) */
 .over-note {
   display: flex;

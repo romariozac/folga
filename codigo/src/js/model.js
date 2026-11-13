@@ -154,6 +154,7 @@ export function defaultCore() {
     goals: [],
     rules: {}, // aprendizado da importação: { 'despesa:maria silva': 'diarista' }
     autoSkip: {}, // contas automáticas desmarcadas: { 'linhaId@YYYY-MM': 1 }
+    closes: {}, // fechamento do mês: como foi coberto o que faltou (ver CLOSE_HOW)
     game: {
       xp: 0,
       badges: {},
@@ -508,6 +509,45 @@ export function carryIn(S, mk) {
     for (let m = addMonths(cm, 1); m < mk; m = addMonths(m, 1)) bal += monthCalc(S, m).saldoPrev;
   }
   return bal;
+}
+
+// ---------- fechamento do mês: como foi coberto o que faltou ----------
+// No banco não existe saldo negativo: o que faltou num mês virou dívida (cartão, rotativo, cheque especial,
+// parcelamento) ou saiu da reserva. A resposta fica em core.closes[mês] = { at, parts: [{ how, v, ... }] }.
+// Cartão, rotativo e cheque especial só dão nome ao saldo negativo (all: a resposta vale para o valor que for).
+// Parcelamento e reserva lançam no mês uma entrada (t.cv = mês) que cobre o que faltou; o que a resposta pôs no
+// plano leva l.cover = mês. Assim dá para trocar ou apagar a resposta sem sobrar nada.
+export const CLOSE_HOW = {
+  cartao: { emo: '💳', name: 'Gastei no cartão', help: 'Vai na fatura do mês seguinte. Sem juros, se pagar a fatura inteira.', short: 'no cartão', label: true },
+  rotativo: { emo: '🧾', name: 'Paguei só parte da fatura', help: 'O resto ficou no rotativo do cartão, com juros.', short: 'no rotativo do cartão', label: true },
+  cheque: { emo: '🏦', name: 'Cheque especial', help: 'A conta do banco ficou negativa, com juros.', short: 'no cheque especial', label: true },
+  parcelado: { emo: '📄', name: 'Parcelei ou peguei empréstimo', help: 'O banco cobriu agora; você paga em parcelas.', short: 'parcelado', label: false },
+  reserva: { emo: '🐷', name: 'Usei a reserva', help: 'Tirei da reserva para cobrir.', short: 'da reserva', label: false },
+};
+/** Juros estimados por mês, só para a previsão (o valor certo entra ao importar a fatura ou o extrato). */
+export const CLOSE_RATE = { rotativo: 0.15, cheque: 0.08 };
+
+export const closeOf = (S, mk) => (S.core.closes && S.core.closes[mk]) || null;
+
+/** O que as coberturas (parcelamento, reserva) somaram ao saldo do mês. */
+function coverIn(S, mk) {
+  let s = 0;
+  for (const t of txOf(S, mk)) if (t.cv) s += t.k === 'receita' ? t.v : -t.v;
+  return s;
+}
+
+/** Quanto faltou no fim do mês mk (já fechado), antes das coberturas. 0 se não faltou. */
+export function shortfall(S, mk) {
+  return Math.max(0, coverIn(S, mk) - carryIn(S, addMonths(mk, 1)));
+}
+
+/** Quanto do que faltou ainda não tem resposta (negativo: a resposta cobre mais do que falta hoje). */
+export function closeOpen(S, mk) {
+  const g = shortfall(S, mk);
+  const rec = closeOf(S, mk);
+  if (!rec) return g;
+  if (rec.parts.some((p) => p.all)) return 0;
+  return g - sum(rec.parts, (p) => p.v);
 }
 
 /** Projeção mês a mês (o coração da planilha do Cerbasi: tudo que vai entrar e sair). */
