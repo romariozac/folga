@@ -519,8 +519,8 @@ export function openCatchUp() {
 /** Check-in: o saldo previsto para o fim do mês, igual ao do Início (com o que sobrou ou faltou do mês anterior). */
 function ckProjHTML(c, carry) {
   const end = carry + c.saldoExp;
-  const note = carryNote(carry, c.mk);
-  return `<div class="ck-proj"><span>Previsão de sobra no fim do mês${note ? `<small>${note}</small>` : ''}</span><b class="${end < 0 ? 'neg' : ''}">${money(end)}</b></div>`;
+  const note = carryNote(carry, c.saldoExp, c.mk);
+  return `<div class="ck-proj"><span>Previsão de sobra no fim do mês${note ? `<small>${note.html}</small>` : ''}</span><b class="${end < 0 ? 'neg' : ''}">${money(end)}</b></div>`;
 }
 
 export function openCheckin() {

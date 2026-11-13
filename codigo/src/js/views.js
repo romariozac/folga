@@ -43,11 +43,20 @@ export function topbarHTML() {
 }
 
 // ---------- início ----------
-/** O que sobrou (ou faltou) do mês anterior e já está somado no saldo deste mês. Vazio se não sobrou nem faltou. */
-export function carryNote(carry, mk) {
-  if (Math.abs(carry) < 100) return '';
-  const prevName = U.monthName(U.addMonths(mk, -1));
-  return carry > 0 ? `Já conta os ${m0(carry)} que sobraram de ${prevName}.` : `Já conta os ${m0(-carry)} que faltaram em ${prevName}.`;
+/**
+ * O saldo do fim do mês em duas partes: o que veio do mês anterior e o resultado deste mês
+ * (ex.: “Outubro +R$ 3 · Novembro −R$ 3.516”). Devolve { html, label }, ou null se o mês anterior fechou zerado.
+ */
+export function carryNote(carry, monthResult, mk) {
+  if (Math.abs(carry) < 100) return null;
+  const sm = (v) => U.money(v, { sign: true, cents: false });
+  const prevName = U.cap(U.monthName(U.addMonths(mk, -1)));
+  const name = U.cap(U.monthName(mk));
+  const part = (n, v) => `<span class="cn-part">${n} <b class="${v < 0 ? 'neg' : ''}">${sm(v)}</b></span>`;
+  return {
+    html: `${part(prevName, carry)} <span class="cn-sep" aria-hidden="true">·</span> ${part(name, monthResult)}`,
+    label: `${prevName} ${sm(carry)}, ${name} ${sm(monthResult)}`,
+  };
 }
 
 /**
@@ -55,8 +64,9 @@ export function carryNote(carry, mk) {
  * final da aba Mês) e quanto já foi gasto do previsto. O detalhe (previsto x realizado) fica na aba Mês.
  */
 function monthCardHTML(c, hasPlan, carry) {
-  const hero = carry + (hasPlan ? c.saldoExp : c.saldoReal);
-  const note = carryNote(carry, c.mk);
+  const result = hasPlan ? c.saldoExp : c.saldoReal;
+  const hero = carry + result;
+  const note = carryNote(carry, result, c.mk);
   const spent = c.real.despesa;
   const prev = c.prev.despesa;
   const pct = prev ? Math.round((spent / prev) * 100) : 0;
@@ -65,7 +75,7 @@ function monthCardHTML(c, hasPlan, carry) {
     <p class="eyebrow">${U.cap(U.monthName(c.mk))}</p>
     <p class="hero-label">${hasPlan ? 'Sobra prevista no fim do mês' : 'Saldo até agora'}</p>
     <p class="hero ${hero < 0 ? 'neg' : ''}">${heroMoney(hero)}</p>
-    ${note ? `<p class="hero-note">${note}</p>` : ''}
+    ${note ? `<button class="hero-note" data-act="tab" data-tab="mes" aria-label="${note.label}. Ver a conta na aba Mês">${note.html}<span class="cn-go" aria-hidden="true">${IC.right}</span></button>` : ''}
     ${hasPlan && hero < 0 ? '<p class="hero-sub"><span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho.</p>' : ''}
     ${
       prev
