@@ -635,20 +635,43 @@ export function openCheckin() {
 }
 
 // =============== EDITOR DE ITEM DO PLANO ===============
-export function openLineEditor(line = null, defaults = {}) {
+/** O item já acontecia antes deste mês (nos últimos 3 anos)? Então dá para mudar o valor só deste mês em diante. */
+function occursBefore(l, mk) {
+  const start = l.start || '2000-01';
+  for (let m = U.addMonths(mk, -1), i = 0; i < 36 && m >= start; m = U.addMonths(m, -1), i++) if (M.occurs(l, m)) return true;
+  return false;
+}
+
+/**
+ * Editor de um item do plano. viewMk: o mês escolhido na aba Plano quando o item foi aberto pela lista daquele
+ * mês. Aí, ao mudar o valor de um item de todo mês ou de meses do ano, a tela pergunta se o valor novo vale
+ * daquele mês em diante (o item vira dois: o de antes termina no mês anterior) ou em todos os meses.
+ */
+export function openLineEditor(line = null, defaults = {}, { mk: viewMk = null } = {}) {
   const isNew = !line;
   const L = line
     ? { ...line, months: [...(line.months || [])] }
     : { id: U.uid(), name: '', kind: 'despesa', cat: 'moradia', amount: 0, type: 'conta', rec: 'mensal', start: curMk(), months: [], count: 2, day: null, ...defaults };
   if (!L.months.length) L.months = [+curMk().slice(5)];
   const defaultCat = { receita: 'salario', despesa: 'moradia', invest: 'reserva' };
+  const mesAno = (mk) => `${U.monthName(mk)} de ${mk.slice(0, 4)}`;
+  const canSplit = !isNew && !!viewMk && (line.rec === 'mensal' || line.rec === 'anual') && !line.goal && !line.rest && !line.cover && M.occurs(line, viewMk) && occursBefore(line, viewMk);
+  let split = 'from';
+  const sub = !isNew && viewMk ? `Você está vendo <b>${mesAno(viewMk)}</b>` : isNew && viewMk && viewMk !== curMk() ? `Começa em <b>${mesAno(viewMk)}</b>, o mês escolhido no gráfico. Dá para mudar em “A partir de”.` : 'Tudo que entra, sai ou é guardado, mês a mês.';
 
   openSheet(
-    `${sheetHead(isNew ? 'Novo item do plano' : 'Editar item do plano', 'Tudo que entra, sai ou é guardado, mês a mês.')}
+    `${sheetHead(isNew ? 'Novo item do plano' : 'Editar item do plano', sub)}
     <form class="form line-form">
       <div class="seg full" data-seg="kind"><button type="button" data-v="receita">Receita</button><button type="button" data-v="despesa">Gasto</button><button type="button" data-v="invest">Guardar</button></div>
       <label class="field"><span>Nome</span><input name="name" value="${esc(L.name)}" placeholder="Ex.: Aluguel, IPVA, Salário" required maxlength="60"></label>
       <label class="field"><span data-amount-label>Valor</span><div class="money-in"><span>R$</span><input name="amount" inputmode="decimal" value="${U.moneyInput(L.amount)}" placeholder="0,00" required></div></label>
+      ${
+        canSplit
+          ? `<div class="field" data-split hidden><span>O novo valor vale para quais meses?</span>
+        <div class="seg full" data-seg="split"><button type="button" data-v="from" class="on">De ${U.monthName(viewMk)} em diante</button><button type="button" data-v="all">Todos os meses</button></div>
+        <small class="help" data-split-help></small></div>`
+          : ''
+      }
       <details class="dream" data-only="invest"><summary>Calcular pelo seu sonho</summary>
         <div class="two"><label class="field"><span>Quanto custa o sonho?</span><div class="money-in sm"><span>R$</span><input name="dream" inputmode="decimal" placeholder="0,00"></div></label>
         <label class="field"><span>Em quantos meses?</span><input name="dreamMonths" type="number" min="1" max="600" inputmode="numeric" placeholder="24"></label></div>
@@ -665,7 +688,7 @@ export function openLineEditor(line = null, defaults = {}) {
       <div class="field" data-rec="anual"><span>Em quais meses? (repete todo ano)</span><div class="months-grid">${U.MES_CURTO.map((m, i) => `<button type="button" class="mtog ${L.months.includes(i + 1) ? 'on' : ''}" data-m="${i + 1}">${m}</button>`).join('')}</div></div>
       <div class="field" data-rec="parcelas"><span>Número de parcelas</span><input name="count" type="number" min="1" max="360" inputmode="numeric" value="${L.count || 2}"></div>
       <div class="field" data-rec-start><span data-start-label>A partir de</span>${monthPicker('start', L.start)}</div>
-      <div class="field" data-rec="mensal"><span>Termina em (opcional)</span><label class="tog inline"><input type="checkbox" name="hasEnd" ${L.end ? 'checked' : ''}><span>Tem data para acabar</span></label><div data-end ${L.end ? '' : 'hidden'}>${monthPicker('end', L.end || U.addMonths(curMk(), 11))}</div></div>
+      <div class="field" data-rec="mensal" data-end-field><span>Termina em (opcional)</span><label class="tog inline"><input type="checkbox" name="hasEnd" ${L.end ? 'checked' : ''}><span>Tem data para acabar</span></label><div data-end ${L.end ? '' : 'hidden'}>${monthPicker('end', L.end || U.addMonths(curMk(), 11))}</div></div>
       <label class="field" data-only-conta><span>Dia do vencimento (opcional)</span><input name="day" type="number" min="1" max="31" inputmode="numeric" value="${L.day || ''}" placeholder="Ex.: 10"></label>
       <label class="tog inline" data-only-conta><input type="checkbox" name="auto" ${L.auto ? 'checked' : ''}><span data-auto-label></span></label>
       <div class="row-btns">${isNew ? '' : '<button type="button" class="btn ghost danger-text" data-del>Excluir</button>'}<button class="btn primary" type="submit">Salvar</button></div>
@@ -680,6 +703,7 @@ export function openLineEditor(line = null, defaults = {}) {
           form.dataset.rec = L.rec;
           $$('[data-seg] [data-v]', form).forEach((b) => {
             const seg = b.parentElement.dataset.seg;
+            if (seg === 'split') return;
             const cur = seg === 'kind' ? L.kind : seg === 'type' ? L.type : L.rec;
             b.classList.toggle('on', b.dataset.v === cur);
           });
@@ -687,11 +711,32 @@ export function openLineEditor(line = null, defaults = {}) {
           $('[data-auto-label]', form).textContent = AUTO_LABEL[L.kind];
           $('[data-amount-label]', form).textContent = L.rec === 'parcelas' ? 'Valor de cada parcela' : L.kind === 'despesa' && L.type === 'verba' ? 'Limite por mês' : 'Valor';
           $('[data-start-label]', form).textContent = L.rec === 'parcelas' ? 'Primeira parcela em' : L.rec === 'unico' ? 'Em qual mês?' : 'A partir de';
+          syncSplit();
         };
+        // valor diferente do que estava, olhando um mês: de qual mês em diante ele vale
+        const syncSplit = () => {
+          const box = $('[data-split]', form);
+          if (!box) return;
+          const v = U.parseMoney(form.elements.amount.value);
+          box.hidden = !(v > 0 && v !== line.amount && L.rec === line.rec);
+          if (box.hidden) return;
+          $$('[data-v]', box).forEach((b) => b.classList.toggle('on', b.dataset.v === split));
+          const prev = U.addMonths(viewMk, -1);
+          $('[data-split-help]', box).innerHTML =
+            split === 'from'
+              ? `Até ${mesAno(prev)} continua <b>${m0(line.amount)}</b>; de ${mesAno(viewMk)} em diante passa a <b>${m0(v)}</b>.`
+              : `Todos os meses do item passam a <b>${m0(v)}</b>, inclusive os anteriores a ${mesAno(viewMk)}.`;
+        };
+        form.elements.amount.addEventListener('input', syncSplit);
         el.addEventListener('click', async (e) => {
           const sv = e.target.closest('[data-seg] [data-v]');
           if (sv) {
             const seg = sv.parentElement.dataset.seg;
+            if (seg === 'split') {
+              split = sv.dataset.v;
+              syncSplit();
+              return;
+            }
             if (seg === 'kind') {
               L.kind = sv.dataset.v;
               L.cat = defaultCat[L.kind];
@@ -738,7 +783,10 @@ export function openLineEditor(line = null, defaults = {}) {
         form.elements.dreamMonths.addEventListener('input', dreamCalc);
         form.addEventListener('click', (e) => {
           const u = e.target.closest('[data-use]');
-          if (u) form.elements.amount.value = U.moneyInput(+u.dataset.use);
+          if (u) {
+            form.elements.amount.value = U.moneyInput(+u.dataset.use);
+            syncSplit();
+          }
         });
         form.addEventListener('submit', (e) => {
           e.preventDefault();
@@ -750,7 +798,9 @@ export function openLineEditor(line = null, defaults = {}) {
           const out = { id: L.id, name, kind: L.kind, cat: L.cat, amount, type: L.kind === 'despesa' ? L.type : 'conta', rec: L.rec, start: readMonth(form, 'start') };
           if (L.rec === 'anual') out.months = L.months;
           if (L.rec === 'parcelas') out.count = Math.max(1, Math.min(360, +form.elements.count.value || 1));
-          if (L.rec === 'mensal' && form.elements.hasEnd.checked) out.end = readMonth(form, 'end');
+          if ((L.rec === 'mensal' || L.rec === 'anual') && form.elements.hasEnd.checked) out.end = readMonth(form, 'end');
+          // o que a tela não mostra continua no item: o resto de uma conta paga em parte, a resposta do fechamento, a meta
+          for (const k of ['rest', 'cover', 'goal']) if (line && line[k] != null) out[k] = line[k];
           const day = +form.elements.day.value;
           if (out.type === 'conta' && day >= 1 && day <= 31) out.day = day;
           if (out.type === 'conta' && form.elements.auto.checked) {
@@ -760,6 +810,15 @@ export function openLineEditor(line = null, defaults = {}) {
           if (L.rec === 'anual') {
             // começa a valer no mês corrente para não "sumir" com meses do ano já passados
             out.start = out.start > curMk() ? out.start : U.mkOf(today()).slice(0, 4) + '-01';
+          }
+          const splitBox = $('[data-split]', form);
+          if (splitBox && !splitBox.hidden && split === 'from') {
+            const res = A.splitLine(line, out, viewMk);
+            A.autoPayDue();
+            close();
+            rerender();
+            A.notify(`Plano atualizado: de ${mesAno(viewMk)} em diante, <b>${m0(amount)}</b>.<br><small>Até ${mesAno(U.addMonths(viewMk, -1))} continua ${m0(line.amount)}.</small>`, res.events);
+            return;
           }
           const events = A.saveLine(out);
           A.autoPayDue();

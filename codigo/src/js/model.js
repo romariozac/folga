@@ -393,7 +393,7 @@ export function occurs(l, mk) {
     case 'mensal':
       return mk >= start && (!l.end || mk <= l.end);
     case 'anual':
-      return mk >= start && (l.months || []).includes(+mk.slice(5, 7));
+      return mk >= start && (!l.end || mk <= l.end) && (l.months || []).includes(+mk.slice(5, 7));
     case 'parcelas': {
       const d = monthDiff(start, mk);
       return d >= 0 && d < (l.count || 1);
@@ -662,23 +662,18 @@ export function savings(S, mk) {
   return { reserve, metas, other, total, in12, plannedNow, realNow };
 }
 
-/** Média por mês do plano nos próximos 12 meses: para onde vai a renda. */
-export function planSplit(S, fromMk) {
+/** Parte da renda de um item do plano: renda, contas fixas, dia a dia, anuais e parcelas, ou guardar. */
+export const splitPart = (l) => (l.kind === 'receita' ? 'renda' : l.kind === 'invest' ? 'guardar' : l.type === 'verba' ? 'verbas' : l.rec === 'mensal' ? 'fixas' : 'anuais');
+
+/** Para onde vai a renda: a média por mês dos próximos 12 meses (n = 12) ou um mês só (n = 1). */
+export function planSplit(S, fromMk, n = 12) {
   const t = { renda: 0, fixas: 0, verbas: 0, anuais: 0, guardar: 0 };
   const out = restsOut(S);
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < n; i++) {
     const mk = addMonths(fromMk, i);
-    for (const l of S.core.plan) {
-      if (!occurs(l, mk)) continue;
-      const v = amountIn(l, mk, out);
-      if (l.kind === 'receita') t.renda += v;
-      else if (l.kind === 'invest') t.guardar += v;
-      else if (l.type === 'verba') t.verbas += v;
-      else if (l.rec === 'mensal') t.fixas += v;
-      else t.anuais += v;
-    }
+    for (const l of S.core.plan) if (occurs(l, mk)) t[splitPart(l)] += amountIn(l, mk, out);
   }
-  for (const k of Object.keys(t)) t[k] = Math.round(t[k] / 12);
+  for (const k of Object.keys(t)) t[k] = Math.round(t[k] / n);
   t.sobra = t.renda - t.fixas - t.verbas - t.anuais - t.guardar;
   return t;
 }
@@ -698,7 +693,7 @@ export function recText(l) {
     case 'mensal':
       return (l.type === 'verba' ? 'por mês, aos poucos' : 'todo mês') + day + (l.end ? ` até ${M[+l.end.slice(5) - 1]}/${l.end.slice(2, 4)}` : '') + auto;
     case 'anual':
-      return (l.months || []).map((m) => M[m - 1]).join(', ') + ' (todo ano)' + day + auto;
+      return (l.months || []).map((m) => M[m - 1]).join(', ') + ' (todo ano)' + (l.end ? ` até ${M[+l.end.slice(5) - 1]}/${l.end.slice(2, 4)}` : '') + day + auto;
     case 'parcelas':
       return `${l.count}x a partir de ${M[+l.start.slice(5) - 1]}/${l.start.slice(2, 4)}` + day + auto;
     case 'unico':
@@ -711,7 +706,7 @@ export function recText(l) {
 // ---------- itens do plano: ordem e texto curto ----------
 /** Último mês em que o item acontece (null = não tem fim). */
 export function lastMk(l) {
-  if (l.rec === 'mensal') return l.end || null;
+  if (l.rec === 'mensal' || l.rec === 'anual') return l.end || null;
   if (l.rec === 'unico') return l.start;
   if (l.rec === 'parcelas') return addMonths(l.start, (l.count || 1) - 1);
   return null;
@@ -742,12 +737,16 @@ export const planDay = (l, mk) => (l.rec === 'mensal' && l.type !== 'verba' && l
  */
 export function planMeta(l, mk) {
   const last = lastMk(l);
-  if (last && last < mk) return l.rec === 'parcelas' ? `${l.count}x · terminou em ${monthShortYear(last)}` : l.rec === 'mensal' ? `terminou em ${monthShortYear(last)}` : `${monthShortYear(last)} · já passou`;
+  if (last && last < mk) return l.rec === 'parcelas' ? `${l.count}x · terminou em ${monthShortYear(last)}` : l.rec === 'mensal' || l.rec === 'anual' ? `terminou em ${monthShortYear(last)}` : `${monthShortYear(last)} · já passou`;
   const parts = [];
   if (l.rec === 'mensal') {
     if (l.start > mk) parts.push(`a partir de ${monthShortYear(l.start)}`);
     if (l.end) parts.push(`até ${monthShortYear(l.end)}`);
-  } else if (l.rec === 'anual') parts.push(`${listPT((l.months || []).map((m) => MES_CURTO[m - 1]))} · todo ano`);
+  } else if (l.rec === 'anual') {
+    parts.push(`${listPT((l.months || []).map((m) => MES_CURTO[m - 1]))} · todo ano`);
+    if (l.start > mk) parts.push(`a partir de ${monthShortYear(l.start)}`);
+    if (l.end) parts.push(`até ${monthShortYear(l.end)}`);
+  }
   else if (l.rec === 'parcelas') {
     const n = monthDiff(l.start, mk) + 1;
     parts.push(n >= 1 ? `parcela ${n} de ${l.count} · até ${monthShortYear(last)}` : `${l.count}x de ${monthShortYear(l.start)} a ${monthShortYear(last)}`);

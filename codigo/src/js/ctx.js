@@ -14,6 +14,7 @@ export const ctx = {
     planOpen: new Set(), // grupos abertos em "Itens do plano"
     planCheck: false, // "Conferir o plano" aberto
     planSel: null, // mês escolhido no gráfico da aba Plano
+    planAll: false, // aba Plano: “Todos” os itens (com a média por mês) em vez dos itens do mês escolhido
     showDoneGoals: false,
   },
   render: () => {},
