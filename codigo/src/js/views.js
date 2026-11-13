@@ -304,7 +304,7 @@ function carryWhyHTML(st, mk, carry) {
         : `${U.cap(H[labels[0].how].short)}, com juros`
       : labels.map((p) => `${m0(p.v)} ${H[p.how].short}`).join(' · ');
   // linha própria, embaixo do saldo anterior: não mexe na largura das colunas de valores
-  return `<tr class="carry-why"><td colspan="3">${txt}</td></tr>`;
+  return `<tr class="carry-why"><td colspan="3"><span class="op" aria-hidden="true"></span>${txt}</td></tr>`;
 }
 
 export function homeHTML() {
@@ -455,7 +455,7 @@ export function monthHTML() {
   const cm = curMk();
   const isCur = mk === cm;
   const future = mk > cm;
-  const tr = (cls, label, p, r) => `<tr><th><i class="sw ${cls}"></i>${label}</th><td>${m0(p)}</td><td><b>${m0(r)}</b></td></tr>`;
+  const tr = (op, cls, label, p, r) => `<tr><th>${opHTML(op)}<i class="sw ${cls}"></i>${label}</th><td>${m0(p)}</td><td><b>${m0(r)}</b></td></tr>`;
   // como no extrato do banco: o saldo do fim do mês anterior entra no começo deste
   const carry = M.carryIn(st, mk);
   const neg = (v) => (v < 0 ? 'neg' : '');
@@ -515,14 +515,18 @@ export function monthHTML() {
     </section>
     ${doubleHTML(st, mk, cm)}
     <section class="card ${reveal()}">
-      <table class="pr-table">
+      <table class="pr-table ledger">
         <thead><tr><th></th><th>Previsto</th><th>Realizado</th></tr></thead>
         <tbody>
-          <tr class="carry"><th>Saldo anterior${future ? '' : ` <button class="link small" data-act="carry-edit" data-mk="${mk}">ajustar</button>`}</th><td class="${neg(carry)}">${m0(carry)}</td><td class="${future ? '' : neg(carry)}">${future ? '—' : m0(carry)}</td></tr>${carryWhyHTML(st, mk, carry)}
-          ${tr('in', 'Entradas', c.prev.receita, c.real.receita)}${tr('out', 'Despesas', c.prev.despesa, c.real.despesa)}${tr('inv', 'Investimento', c.prev.invest, c.real.invest)}
-          <tr class="month-res"><th>Saldo do mês</th><td class="${neg(c.saldoPrev)}">${m0(c.saldoPrev)}</td><td class="${future ? '' : neg(c.saldoReal)}">${future ? '—' : m0(c.saldoReal)}</td></tr>
+          <tr class="carry"><th>${opHTML('')}<button class="pr-go" data-act="mk-prev" aria-label="Saldo anterior: ver ${U.monthName(U.addMonths(mk, -1))}">Saldo anterior${IC.right}</button>${future ? '' : ` <button class="link small" data-act="carry-edit" data-mk="${mk}">ajustar</button>`}</th><td class="${neg(carry)}">${m0(carry)}</td><td class="${future ? '' : neg(carry)}">${future ? '—' : m0(carry)}</td></tr>${carryWhyHTML(st, mk, carry)}
+          ${GAP_ROW(3)}
         </tbody>
-        <tfoot><tr><th>Saldo final</th><td class="${neg(carry + c.saldoPrev)}">${m0(carry + c.saldoPrev)}</td><td class="${future ? '' : neg(carry + c.saldoReal)}"><b>${future ? '—' : m0(carry + c.saldoReal)}</b></td></tr></tfoot>
+        <tbody class="pr-month">
+          ${tr('+', 'in', 'Entradas', c.prev.receita, c.real.receita)}${tr('−', 'out', 'Despesas', c.prev.despesa, c.real.despesa)}${tr('−', 'inv', 'Investimento', c.prev.invest, c.real.invest)}
+          <tr class="month-res"><th>${opHTML('')}Saldo do mês</th><td class="${neg(c.saldoPrev)}">${m0(c.saldoPrev)}</td><td class="${future ? '' : neg(c.saldoReal)}">${future ? '—' : m0(c.saldoReal)}</td></tr>
+        </tbody>
+        <tbody>${GAP_ROW(3)}</tbody>
+        <tfoot><tr><th>${opHTML('=')}Saldo final</th><td class="${neg(carry + c.saldoPrev)}">${m0(carry + c.saldoPrev)}</td><td class="${future ? '' : neg(carry + c.saldoReal)}"><b>${future ? '—' : m0(carry + c.saldoReal)}</b></td></tr></tfoot>
       </table>
       ${future ? '' : overNoteHTML(st, c, carry, isCur)}
       ${mk < cm ? closeLineHTML(st, mk) : ''}
@@ -655,7 +659,7 @@ export function refreshPlanItems() {
   if (!box) return;
   const st = S();
   const cm = curMk();
-  box.outerHTML = planItemsHTML(st, cm, M.projection(st, cm, 12));
+  box.outerHTML = planItemsHTML(st, cm, M.projection(st, cm, 12, { real: true }));
 }
 
 export function planHTML() {
@@ -664,7 +668,7 @@ export function planHTML() {
   const plan = st.core.plan;
   if (!plan.length) return planCTAHTML();
   const cm = curMk();
-  const rows = M.projection(st, cm, 12);
+  const rows = M.projection(st, cm, 12, { real: true });
   const last = rows[rows.length - 1];
   const neg = rows.filter((r) => r.saldo < 0);
   const redMonths = neg.length > 4 ? `${neg.slice(0, 3).map((r) => U.monthShortYear(r.mk)).join(', ')} e mais ${neg.length - 3}` : U.listPT(neg.map((r) => U.monthShortYear(r.mk)));
@@ -802,17 +806,33 @@ export function gameHTML() {
 }
 
 // ---------- gráficos ----------
-/** Valores de um mês da projeção (painel fixo abaixo do gráfico, na aba Plano). */
-function monthDetailHTML(r) {
+/** Sinal da conta na primeira coluna (+, −, =); vazio só guarda o lugar, para os nomes ficarem alinhados. */
+const opHTML = (op) => `<span class="op" aria-hidden="true">${op}</span>`;
+/** Espaço entre o saldo anterior, o bloco do mês e o saldo final. */
+const GAP_ROW = (n) => `<tr class="pr-gap" aria-hidden="true"><td colspan="${n}"></td></tr>`;
+
+/**
+ * Valores de um mês da projeção (painel fixo abaixo do gráfico, na aba Plano), com a mesma conta da aba Mês:
+ * o acumulado do mês anterior (tocar mostra aquele mês), + entra, − despesas, − investimento (o bloco do mês,
+ * com a sobra dele), = acumulado.
+ */
+function monthDetailHTML(r, i = 0) {
   const neg = r.saldo < 0;
+  const cls = (v) => (v < 0 ? ' class="neg"' : '');
+  const row = (op, sw, label, v) => `<tr><th>${opHTML(op)}${sw}${label}</th><td${cls(v)}>${m0(v)}</td></tr>`;
   return `<div class="md-head"><b>${U.monthLabel(r.mk)}</b>${neg ? '<span class="md-flag"><span class="flag-ic crit">!</span>no vermelho</span>' : ''}</div>
-    <dl class="md-grid">
-      <dt><i class="sw in"></i>Entra</dt><dd>${m0(r.receita)}</dd>
-      <dt><i class="sw out"></i>Despesas</dt><dd>${m0(r.despesa)}</dd>
-      <dt><i class="sw inv"></i>Investimento</dt><dd>${m0(r.invest)}</dd>
-      <dt class="md-sum">Sobra do mês</dt><dd class="md-sum ${neg ? 'neg' : ''}">${m0(r.saldo)}</dd>
-      <dt><i class="sw-line"></i>Acumulado</dt><dd class="${r.acc < 0 ? 'neg' : ''}">${m0(r.acc)}</dd>
-    </dl>
+    <table class="md-table ledger">
+      <tbody>
+        <tr class="carry"><th>${opHTML('')}<button class="pr-go" data-act="plan-prev" data-i="${i}" aria-label="Saldo anterior: ver ${U.monthName(U.addMonths(r.mk, -1))}">Saldo anterior${IC.right}</button></th><td${cls(r.start)}>${m0(r.start)}</td></tr>
+        ${GAP_ROW(2)}
+      </tbody>
+      <tbody class="pr-month">
+        ${row('+', '<i class="sw in"></i>', 'Entra', r.receita)}${row('−', '<i class="sw out"></i>', 'Despesas', r.despesa)}${row('−', '<i class="sw inv"></i>', 'Investimento', r.invest)}
+        <tr class="month-res"><th>${opHTML('')}Sobra do mês</th><td${cls(r.saldo)}>${m0(r.saldo)}</td></tr>
+      </tbody>
+      <tbody>${GAP_ROW(2)}</tbody>
+      <tfoot><tr><th>${opHTML('=')}<i class="sw-line"></i>Acumulado</th><td${cls(r.acc)}>${m0(r.acc)}</td></tr></tfoot>
+    </table>
     ${r.extras.length ? `<p class="md-extras">Extras do mês: ${esc(U.listPT(r.extras.map((l) => l.name)))}</p>` : ''}`;
 }
 
@@ -835,7 +855,7 @@ export function mountChart(box, rows, { panel = null, initial = 0, onSelect = nu
     if (!r) return;
     mark(i);
     if (panel) {
-      panel.innerHTML = monthDetailHTML(r);
+      panel.innerHTML = monthDetailHTML(r, i);
       if (onSelect) onSelect(i);
       return;
     }
@@ -877,9 +897,9 @@ export function mountChart(box, rows, { panel = null, initial = 0, onSelect = nu
 export function mountCharts(root) {
   for (const box of $$('[data-chart]', root)) {
     const kind = box.dataset.chart;
-    if (kind === 'home') mountChart(box, M.projection(S(), curMk(), 6));
+    if (kind === 'home') mountChart(box, M.projection(S(), curMk(), 6, { real: true }));
     else if (kind === 'plan') {
-      const rows = M.projection(S(), curMk(), 12);
+      const rows = M.projection(S(), curMk(), 12, { real: true });
       mountChart(box, rows, {
         panel: root.querySelector('[data-month-detail]'),
         initial: planSelIndex(rows),
