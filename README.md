@@ -99,7 +99,9 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
   do plano** abre a lista inteira. Assim nada passa batido.
 - **Pagou só parte?** Ao marcar uma conta com valor menor que o previsto (na tela *Quanto pagou?* ou na conciliação),
   aparece **Passar o resto (R$ …) para o mês seguinte**. Marcado, o resto vira um item “só em” do mês seguinte
-  (ex.: *Fatura de cartão · resto de nov*): entra nas contas a pagar e na sobra prevista de lá. Mudar o valor pago
+  (ex.: *Fatura de cartão · resto de nov*): entra nas contas a pagar e na sobra prevista de lá, e sai do mês da conta,
+  para não contar duas vezes (a fatura de R$ 5.000 paga com R$ 2.500 conta R$ 2.500 em novembro e R$ 2.500 em
+  dezembro, na sobra prevista, no saldo que passa de um mês para o outro e na tabela do Plano). Mudar o valor pago
   acerta o resto; pagar tudo, desmarcar ou excluir o pagamento tira o resto junto (com **Desfazer**). Se a conta só
   veio menor (luz, água), deixe desmarcado. Na fatura do cartão, o app lembra que no banco o resto entra no rotativo,
   com juros.
