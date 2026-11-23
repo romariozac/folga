@@ -1,5 +1,5 @@
 // Modelo de dados e cálculos do plano (projeção) e do mês (previsto x realizado).
-import { addMonths, monthDiff, isoDate, sum, monthShortYear, listPT, MES_CURTO } from './util.js';
+import { addMonths, monthDiff, isoDate, sum, monthShortYear, listPT, MES_CURTO, pad, daysBetween, daysInMonth } from './util.js';
 import { MERCHANTS } from './merchants.js';
 
 export const KIND_LABEL = { despesa: 'Gasto', receita: 'Receita', invest: 'Investimento' };
@@ -436,6 +436,10 @@ export function amountIn(l, mk, out) {
   return r ? Math.max(0, l.amount - r) : l.amount;
 }
 
+// palavras do nome que identificam uma conta (“Aluguel”, “Salário Empresa X”), sem as genéricas
+const BILL_STOP = new Set(['resto', 'pagamento', 'pagto', 'compra', 'conta', 'contas', 'parcela', 'parcelas', 'boleto', 'debito', 'credito', 'transferencia', 'enviado', 'enviada', 'recebido', 'recebida', 'mensal', 'estimativa']);
+const billToks = (s) => norm(s || '').split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !STOP.has(w) && !BILL_STOP.has(w));
+
 /** Previsto x realizado de um mês (por grupo em byCat; por item em bySub). */
 export function monthCalc(S, mk) {
   const lines = S.core.plan.filter((l) => occurs(l, mk));
@@ -447,12 +451,45 @@ export function monthCalc(S, mk) {
   const real = { receita: 0, despesa: 0, invest: 0 };
   const byCat = {};
   const bySub = {};
-  const slot = (map, id, kind) => (map[id] ||= { id, kind, prev: 0, real: 0, n: 0 });
+  // por grupo: open = o que ainda falta pagar ou receber das contas (pelo previsto); verba = o previsto do dia a dia;
+  // paid = o que já foi pago ou recebido nas contas; free = o resto do realizado (dia a dia e o que não estava no plano)
+  const slot = (map, id, kind) => (map[id] ||= { id, kind, prev: 0, real: 0, n: 0, open: 0, verba: 0, paid: 0, free: 0 });
   const out = restsOut(S);
+  const amt = new Map(lines.map((l) => [l.id, amountIn(l, mk, out)]));
+  const paidIds = new Set(txs.filter((t) => t.p).map((t) => t.p));
+  // Lançamento sem ligação com o plano que parece ser o pagamento de uma conta em aberto (lançado pelo “+” em vez do
+  // “Paguei”, ou do extrato sem conciliar): a mesma categoria da conta (sem dia a dia nela), com valor parecido (até
+  // 40% de diferença) ou perto do vencimento (até 7 dias); ou, noutra categoria, o mesmo nome e valor parecido. Conta
+  // como pagamento dela, sem contar duas vezes; como não foi confirmado, a conta ainda conta pelo previsto, se for
+  // maior (pode ter sido só uma parte).
+  const verbaCats = new Set(lines.filter((l) => l.type === 'verba').map((l) => l.cat));
+  const open = lines.filter((l) => l.type !== 'verba' && !paidIds.has(l.id));
+  const presumed = new Map();
+  const asBill = new Set();
+  for (const t of txs) {
+    if (t.p || !(t.v > 0) || verbaCats.has(t.c)) continue;
+    const tk = billToks(t.n);
+    const near = (l) => Math.abs(amt.get(l.id) - t.v) <= Math.max(100, amt.get(l.id) * 0.4);
+    const onDue = (l) => !!(l.day && t.d) && Math.abs(daysBetween(t.d, `${mk}-${pad(Math.min(l.day, daysInMonth(mk)))}`)) <= 7;
+    const named = (l) => tk.length > 0 && billToks(l.name).some((w) => tk.includes(w));
+    const cands = open.filter((l) => l.kind === t.k && (l.cat === t.c ? near(l) || onDue(l) : near(l) && named(l)));
+    if (!cands.length) continue;
+    cands.sort((a, b) => (a.cat === t.c ? 0 : 1) - (b.cat === t.c ? 0 : 1) || Math.abs(amt.get(a.id) - t.v) - Math.abs(amt.get(b.id) - t.v));
+    const id = cands[0].id;
+    presumed.set(id, (presumed.get(id) || 0) + t.v);
+    asBill.add(t);
+  }
   for (const l of lines) {
-    const v = amountIn(l, mk, out);
+    const v = amt.get(l.id);
     prev[l.kind] += v;
-    slot(byCat, gid(l.cat), l.kind).prev += v;
+    const b = slot(byCat, gid(l.cat), l.kind);
+    b.prev += v;
+    if (l.type === 'verba') b.verba += v;
+    else if (!paidIds.has(l.id)) {
+      const got = presumed.get(l.id) || 0;
+      b.paid += got;
+      b.open += Math.max(0, v - got);
+    }
     slot(bySub, l.cat, l.kind).prev += v;
   }
   for (const t of txs) {
@@ -460,6 +497,8 @@ export function monthCalc(S, mk) {
     const b = slot(byCat, gid(t.c), t.k);
     b.real += t.v;
     b.n++;
+    if (t.p) b.paid += t.v;
+    else if (!asBill.has(t)) b.free += t.v;
     const s = slot(bySub, t.c, t.k);
     s.real += t.v;
     s.n++;
@@ -469,9 +508,15 @@ export function monthCalc(S, mk) {
     .map((l) => ({ line: l, tx: txs.find((t) => t.p === l.id) || null }))
     .sort((a, b) => !!a.tx - !!b.tx || (a.line.day || 99) - (b.line.day || 99) || a.line.name.localeCompare(b.line.name));
 
-  // Projeção do fim do mês: o que já aconteceu ou o que ainda está previsto, o que for maior.
-  const exp = { receita: Math.max(real.receita, prev.receita), invest: Math.max(real.invest, prev.invest), despesa: 0 };
-  for (const b of Object.values(byCat)) if (b.kind === 'despesa') exp.despesa += Math.max(b.real, b.prev);
+  // Projeção do fim do mês, grupo a grupo: o que já aconteceu mais o que ainda falta acontecer pelo plano. Contas
+  // pagas contam pelo valor pago; as em aberto, pelo previsto; o dia a dia, pelo previsto ou pelo gasto, o que for
+  // maior. O gasto a mais no dia a dia (ou fora do plano) não “some” dentro de uma conta que ainda vai ser paga: pagar
+  // ou receber exatamente o previsto não muda a projeção.
+  const exp = { receita: 0, despesa: 0, invest: 0 };
+  for (const b of Object.values(byCat)) {
+    b.exp = b.paid + b.open + (b.verba > 0 ? Math.max(b.verba, b.free) : b.free);
+    exp[b.kind] += b.exp;
+  }
 
   return {
     mk,
@@ -635,20 +680,25 @@ export const goalById = (S, id) => (S.core.goals || []).find((g) => g.id === id)
 export const goalByCat = (S, cat) => (S.core.goals || []).find((g) => g.cat === cat) || null;
 
 /**
- * Situação de uma meta no mês mk: guardado, quanto falta, meses até o prazo (contando mk),
- * quanto guardar por mês para chegar no prazo e quando chega no ritmo planejado.
+ * Situação de uma meta no mês mk: guardado, quanto falta, meses até o prazo (contando mk, se o deste mês ainda não
+ * foi guardado), quanto guardar por mês para chegar no prazo e quando chega no ritmo planejado.
  */
 export function goalInfo(S, g, mk, by = investByCat(S)) {
   const saved = (g.saved0 || 0) + (by[g.cat] || 0);
   const target = g.target || 0;
   const left = Math.max(0, target - saved);
   const reached = target > 0 && saved >= target;
-  const months = g.due ? Math.max(1, monthDiff(mk, g.due) + 1) : null;
   const line = g.line ? S.core.plan.find((l) => l.id === g.line) || null : null;
   const planned = line ? line.amount : 0;
+  // o deste mês já foi guardado: a conta do que falta começa no mês seguinte (senão o prazo parece mais perto e o
+  // “por mês” cai só porque você guardou em dia)
+  const nowTx = txOf(S, mk).filter((t) => t.k === 'invest' && t.c === g.cat);
+  const doneNow = (line && nowTx.some((t) => t.p === line.id)) || (planned > 0 && sum(nowTx, (t) => t.v) >= planned);
+  const from = doneNow ? addMonths(mk, 1) : mk;
+  const months = g.due ? Math.max(1, monthDiff(from, g.due) + 1) : null;
   const need = months ? roundUp10(left / months) : null;
   const late = !reached && need != null && need > planned + 100;
-  const eta = !reached && planned > 0 ? addMonths(mk, Math.ceil(left / planned) - 1) : null;
+  const eta = !reached && planned > 0 ? addMonths(from, Math.ceil(left / planned) - 1) : null;
   return { saved, target, left, reached, months, line, planned, need, late, eta, pct: target ? Math.min(1, Math.max(0, saved / target)) : 0, overdue: !!g.due && mk > g.due && !reached };
 }
 

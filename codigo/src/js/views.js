@@ -20,6 +20,31 @@ function heroMoney(v, { cents = true } = {}) {
   return `${s.slice(0, i)}<small>${s.slice(i)}</small>`;
 }
 
+/**
+ * Valor das tabelas (aba Mês e quadro do Plano): com centavos (pequenos), para a conta fechar centavo por centavo, e
+ * sem o “R$” (a tabela é toda em reais), para caber no celular.
+ */
+const mc = (v) => {
+  const s = money(v).replace(/^([−+]?)R\$\s/, '$1');
+  const i = s.lastIndexOf(',');
+  return `${s.slice(0, i)}<small>${s.slice(i)}</small>`;
+};
+/** Arredonda para reais inteiros, como m0 mostra: diferenças calculadas assim batem com os números na tela. */
+const r0 = (v) => Math.round(v / 100) * 100;
+
+/**
+ * Quanto uma categoria passa do previsto (0 se não passa). No mês atual ou futuro (ahead), conta também o que ainda
+ * vem pelo plano: as contas a pagar e o resto do dia a dia, a mesma conta do Início. Em reais inteiros, fechando com
+ * os números mostrados na barra: gasto + falta pagar + resta − previsto.
+ */
+function catOver(b, ahead) {
+  const end = ahead ? b.exp : b.real;
+  if (end - b.prev < 100) return 0;
+  const left = ahead ? Math.max(0, b.verba - b.free) : 0;
+  const v = r0(b.real) + (ahead ? r0(b.open) + (left >= 100 ? r0(left) : 0) : 0) - r0(b.prev);
+  return Math.max(100, v);
+}
+
 function greeting() {
   const h = new Date().getHours();
   return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
@@ -45,16 +70,18 @@ export function topbarHTML() {
 // ---------- início ----------
 /**
  * O saldo do fim do mês em duas partes: o que veio do mês anterior e o resultado deste mês
- * (ex.: “Outubro +R$ 3 · Novembro −R$ 3.516”). Devolve { html, label }, ou null se o mês anterior fechou zerado.
+ * (ex.: “Outubro +R$ 3,30 · Novembro −R$ 3.516,00”). Devolve { html, label }, ou null se o mês anterior fechou zerado.
  */
-export function carryNote(carry, monthResult, mk) {
+export function carryNote(carry, monthResult, mk, tail = '') {
   if (Math.abs(carry) < 100) return null;
-  const sm = (v) => U.money(v, { sign: true, cents: false });
+  // com centavos, como o número grande: as duas partes somam exatamente o saldo
+  const sm = (v) => U.money(v, { sign: true });
   const prevName = U.cap(U.monthName(U.addMonths(mk, -1)));
   const name = U.cap(U.monthName(mk));
-  const part = (n, v) => `<span class="cn-part">${n} <b class="${v < 0 ? 'neg' : ''}">${sm(v)}</b></span>`;
+  // tail (a setinha do Início) fica grudado na última parte: se a linha quebrar, não sobra sozinho embaixo
+  const part = (n, v, end = '') => `<span class="cn-part">${n} <b class="${v < 0 ? 'neg' : ''}">${sm(v)}</b>${end}</span>`;
   return {
-    html: `${part(prevName, carry)} <span class="cn-sep" aria-hidden="true">·</span> ${part(name, monthResult)}`,
+    html: `${part(prevName, carry)} <span class="cn-sep" aria-hidden="true">·</span> ${part(name, monthResult, tail)}`,
     label: `${prevName} ${sm(carry)}, ${name} ${sm(monthResult)}`,
   };
 }
@@ -66,7 +93,7 @@ export function carryNote(carry, monthResult, mk) {
 function monthCardHTML(c, hasPlan, carry) {
   const result = hasPlan ? c.saldoExp : c.saldoReal;
   const hero = carry + result;
-  const note = carryNote(carry, result, c.mk);
+  const note = carryNote(carry, result, c.mk, `<span class="cn-go" aria-hidden="true">${IC.right}</span>`);
   const spent = c.real.despesa;
   const prev = c.prev.despesa;
   const pct = prev ? Math.round((spent / prev) * 100) : 0;
@@ -75,11 +102,11 @@ function monthCardHTML(c, hasPlan, carry) {
     <p class="eyebrow">${U.cap(U.monthName(c.mk))}</p>
     <p class="hero-label">${hasPlan ? 'Sobra prevista no fim do mês' : 'Saldo até agora'}</p>
     <p class="hero ${hero < 0 ? 'neg' : ''}">${heroMoney(hero)}</p>
-    ${note ? `<button class="hero-note" data-act="tab" data-tab="mes" aria-label="${note.label}. Ver a conta na aba Mês">${note.html}<span class="cn-go" aria-hidden="true">${IC.right}</span></button>` : ''}
+    ${note ? `<button class="hero-note" data-act="tab" data-tab="mes" aria-label="${note.label}. Ver a conta na aba Mês">${note.html}</button>` : ''}
     ${hasPlan && hero < 0 ? '<p class="hero-sub"><span class="flag-ic crit">!</span> Pelo plano, este mês fecha no vermelho.</p>' : ''}
     ${
       prev
-        ? `<div class="spent"><span>Gastou <b>${m0(spent)}</b> de ${m0(prev)}</span>${over ? `<span class="tile-flag"><span class="flag-ic crit">!</span>${m0(spent - prev)} acima</span>` : ''}</div>
+        ? `<div class="spent"><span>Gastou <b>${m0(spent)}</b> de ${m0(prev)}</span>${over ? `<span class="tile-flag"><span class="flag-ic crit">!</span>${m0(r0(spent) - r0(prev))} acima</span>` : ''}</div>
     <div class="meter out" role="img" aria-label="${pct}% do previsto"><i style="width:${Math.min(100, pct)}%"></i></div>`
         : ''
     }
@@ -426,14 +453,16 @@ function doubleHTML(st, mk, cm) {
 }
 
 /**
- * Aviso embaixo do previsto x realizado: quanto já passou do planejado nas despesas e onde (o previsto não muda).
- * No mês atual, diz também onde o mês deve fechar contando isso: o mesmo número do Início.
+ * Aviso embaixo do previsto x realizado: quanto passou do planejado nas despesas e onde (o previsto não muda).
+ * No mês atual, conta também o que ainda vai ser pago (a mesma conta das barras) e diz onde o mês deve fechar:
+ * o mesmo número do Início.
  */
 function overNoteHTML(st, c, carry, isCur) {
   if (!c.lines.length) return '';
+  // os mesmos valores das barras, em reais inteiros (a soma bate com as partes mostradas)
   const overs = Object.values(c.byCat)
-    .filter((b) => b.kind === 'despesa' && b.real - b.prev >= 100)
-    .map((b) => ({ b, v: b.real - b.prev }))
+    .filter((b) => b.kind === 'despesa' && catOver(b, isCur) > 0)
+    .map((b) => ({ b, v: catOver(b, isCur) }))
     .sort((x, y) => y.v - x.v);
   if (!overs.length) return '';
   const total = U.sum(overs, (o) => o.v);
@@ -443,7 +472,7 @@ function overNoteHTML(st, c, carry, isCur) {
   const end = carry + c.saldoExp;
   return `<div class="over-note" role="note">
     <span class="flag-ic crit">!</span>
-    <p><b>Você ${isCur ? 'já passou' : 'passou'} ${m0(total)} do planejado</b> em ${where}.${isCur ? ` Contando isso, o mês deve fechar em <b class="${end < 0 ? 'neg' : ''}">${m0(end)}</b>, como no Início.` : ''}</p>
+    <p><b>${isCur ? `Este mês deve passar ${m0(total)} do planejado` : `Você passou ${m0(total)} do planejado`}</b> em ${where}.${isCur ? ` Contando isso, o mês deve fechar em <b class="${end < 0 ? 'neg' : ''}">${money(end)}</b>, como no Início.` : ''}</p>
   </div>`;
 }
 
@@ -455,7 +484,7 @@ export function monthHTML() {
   const cm = curMk();
   const isCur = mk === cm;
   const future = mk > cm;
-  const tr = (op, cls, label, p, r) => `<tr><th>${opHTML(op)}<i class="sw ${cls}"></i>${label}</th><td>${m0(p)}</td><td><b>${m0(r)}</b></td></tr>`;
+  const tr = (op, cls, label, p, r) => `<tr><th>${opHTML(op)}<i class="sw ${cls}"></i>${label}</th><td>${mc(p)}</td><td><b>${mc(r)}</b></td></tr>`;
   // como no extrato do banco: o saldo do fim do mês anterior entra no começo deste
   const carry = M.carryIn(st, mk);
   const neg = (v) => (v < 0 ? 'neg' : '');
@@ -467,14 +496,23 @@ export function monthHTML() {
   const bullets = cats
     .map((b) => {
       const cat = M.catById(st, b.id);
-      const max = Math.max(b.prev, b.real);
-      const fill = max ? (b.real / max) * 100 : 0;
+      // mês atual ou futuro: além do que já foi (barra cheia), o que ainda vem pelo plano (listrado): as contas a
+      // pagar e o que resta do dia a dia. A barra inteira é onde a categoria deve fechar, a mesma conta do Início.
+      const ahead = mk >= cm;
+      const spent = Math.max(0, b.real);
+      const left = ahead ? Math.max(0, b.verba - b.free) : 0;
+      const coming = ahead ? b.open + left : 0;
+      const max = Math.max(b.prev, spent + coming);
+      const fill = max ? (spent / max) * 100 : 0;
+      const more = max ? (coming / max) * 100 : 0;
       const mark = b.prev && max ? (b.prev / max) * 100 : null;
-      const over = b.prev > 0 && b.real > b.prev;
+      const overBy = catOver(b, ahead);
+      const over = b.prev > 0 && overBy > 0;
+      const still = ahead ? [left >= 100 ? `resta ${m0(left)}` : '', b.open ? `falta pagar ${m0(b.open)}` : ''].filter(Boolean).join(' · ') : '';
       const note = over
-        ? `<p class="bl-flag"><span class="flag-ic crit">!</span>${m0(b.real - b.prev)} acima do previsto</p>`
-        : b.prev && mk >= cm
-          ? `<p class="bl-note">${b.real ? `Resta ${m0(b.prev - b.real)}` : 'Nada lançado ainda'}</p>`
+        ? `<p class="bl-flag"><span class="flag-ic crit">!</span>${m0(overBy)} acima do previsto</p>${still ? `<p class="bl-note">${U.cap(still)}</p>` : ''}`
+        : b.prev && ahead
+          ? `<p class="bl-note">${still ? U.cap(still) : b.real ? 'Previsto já usado' : 'Nada lançado ainda'}</p>`
           : !b.prev
             ? '<p class="bl-note">Fora do plano</p>'
             : '';
@@ -499,7 +537,7 @@ export function monthHTML() {
         <button class="emo emo-btn${sel ? ' on' : ''}" data-act="tx-filter" data-id="${b.id}" aria-pressed="${sel}" aria-label="Ver só os lançamentos de ${esc(cat.name)}">${cat.emoji}</button>
         <div class="bl-main">
           <div class="bl-top">${canOpen ? `<button class="bl-btn" data-act="cat-toggle" data-id="${b.id}" aria-expanded="${open}"><b>${esc(cat.name)}</b><span class="chev ${open ? 'up' : ''}">${IC.right}</span></button>` : `<b>${esc(cat.name)}</b>`}<span><b>${m0(b.real)}</b> <small>/ ${b.prev ? m0(b.prev) : '—'}</small></span></div>
-          <div class="bullet" role="img" aria-label="${esc(cat.name)}: ${m0(b.real)} de ${b.prev ? m0(b.prev) : 'sem previsão'}"><i style="width:${fill.toFixed(1)}%"></i>${mark != null ? `<em style="left:${mark.toFixed(1)}%"></em>` : ''}</div>
+          <div class="bullet" role="img" aria-label="${esc(cat.name)}: ${m0(b.real)} de ${b.prev ? m0(b.prev) : 'sem previsão'}${coming ? `, ainda vêm ${m0(coming)}` : ''}"><i style="width:${fill.toFixed(1)}%"></i>${coming ? `<b style="left:${fill.toFixed(1)}%;width:${more.toFixed(1)}%"></b>` : ''}${mark != null ? `<em style="left:${mark.toFixed(1)}%"></em>` : ''}</div>
           ${note}${drill}
         </div>
       </li>`;
@@ -518,22 +556,22 @@ export function monthHTML() {
       <table class="pr-table ledger">
         <thead><tr><th></th><th>Previsto</th><th>Realizado</th></tr></thead>
         <tbody>
-          <tr class="carry"><th>${opHTML('')}<button class="pr-go" data-act="mk-prev" aria-label="Saldo anterior: ver ${U.monthName(U.addMonths(mk, -1))}">Saldo anterior${IC.right}</button>${future ? '' : ` <button class="link small" data-act="carry-edit" data-mk="${mk}">ajustar</button>`}</th><td class="${neg(carry)}">${m0(carry)}</td><td class="${future ? '' : neg(carry)}">${future ? '—' : m0(carry)}</td></tr>${carryWhyHTML(st, mk, carry)}
+          <tr class="carry"><th>${opHTML('')}<button class="pr-go" data-act="mk-prev" aria-label="Saldo anterior: ver ${U.monthName(U.addMonths(mk, -1))}">Saldo anterior${IC.right}</button>${future ? '' : ` <button class="link small" data-act="carry-edit" data-mk="${mk}">ajustar</button>`}</th><td class="${neg(carry)}">${mc(carry)}</td><td class="${future ? '' : neg(carry)}">${future ? '—' : mc(carry)}</td></tr>${carryWhyHTML(st, mk, carry)}
           ${GAP_ROW(3)}
         </tbody>
         <tbody class="pr-month">
           ${tr('+', 'in', 'Entradas', c.prev.receita, c.real.receita)}${tr('−', 'out', 'Despesas', c.prev.despesa, c.real.despesa)}${tr('−', 'inv', 'Investimento', c.prev.invest, c.real.invest)}
-          <tr class="month-res"><th>${opHTML('')}Saldo do mês</th><td class="${neg(c.saldoPrev)}">${m0(c.saldoPrev)}</td><td class="${future ? '' : neg(c.saldoReal)}">${future ? '—' : m0(c.saldoReal)}</td></tr>
+          <tr class="month-res"><th>${opHTML('')}Saldo do mês</th><td class="${neg(c.saldoPrev)}">${mc(c.saldoPrev)}</td><td class="${future ? '' : neg(c.saldoReal)}">${future ? '—' : mc(c.saldoReal)}</td></tr>
         </tbody>
         <tbody>${GAP_ROW(3)}</tbody>
-        <tfoot><tr><th>${opHTML('=')}Saldo final</th><td class="${neg(carry + c.saldoPrev)}">${m0(carry + c.saldoPrev)}</td><td class="${future ? '' : neg(carry + c.saldoReal)}"><b>${future ? '—' : m0(carry + c.saldoReal)}</b></td></tr></tfoot>
+        <tfoot><tr><th>${opHTML('=')}Saldo final</th><td class="${neg(carry + c.saldoPrev)}">${mc(carry + c.saldoPrev)}</td><td class="${future ? '' : neg(carry + c.saldoReal)}"><b>${future ? '—' : mc(carry + c.saldoReal)}</b></td></tr></tfoot>
       </table>
       ${future ? '' : overNoteHTML(st, c, carry, isCur)}
       ${mk < cm ? closeLineHTML(st, mk) : ''}
     </section>
     <section class="card ${reveal()}">
       <div class="card-head"><h2>Gastos por categoria</h2></div>
-      <p class="card-sub">Barra: quanto já foi. Traço: o previsto. Toque no ícone (ou num item aberto) para ver só os lançamentos dele.</p>
+      <p class="card-sub">Barra: quanto já foi${mk >= cm ? '; listrado: o que ainda vem pelo plano' : ''}. Traço: o previsto. Toque no ícone (ou num item aberto) para ver só os lançamentos dele.</p>
       ${bullets ? `<ul class="bullets">${bullets}</ul>` : `<div class="empty"><p>Sem gastos previstos ou lançados neste mês.</p></div>`}
     </section>
     <section class="card ${reveal()}" id="lancamentos">
@@ -645,7 +683,7 @@ function planItemsHTML(st, cm, rows, anim = '') {
       ${scope}
       ${
         groups.length
-          ? `<p class="eyebrow pg-eyebrow">${all ? 'Média por mês' : `Só o que acontece em ${U.monthName(sel)}`}</p>
+          ? `<p class="eyebrow pg-eyebrow">${all ? 'Média por mês' : `Só o que acontece em ${U.monthName(sel)}${sel === cm ? ', pelo plano' : ''}`}</p>
       ${splitBarHTML(parts, all ? 'Para onde vai a renda, média por mês' : `Para onde vai a renda em ${U.monthLabel(sel)}`)}
       <div class="pg-list">${groups.map(groupHTML).join('')}${sobraRow}</div>`
           : `<p class="card-sub pl-none">Nada no plano em ${U.monthLabel(sel).toLowerCase()}. Toque em “Todos” para ver a lista inteira.</p>`
@@ -697,7 +735,7 @@ export function planHTML() {
           )
           .join('')}</tbody>
       </table>
-      <p class="card-sub">“Sai” inclui o que você guarda. “Acumulado” é a sobra somada mês a mês, se tudo sair como planejado.</p>
+      <p class="card-sub">“Sai” inclui o que você guarda. “Acumulado” parte do saldo que veio do mês passado e soma a sobra de cada mês, se o resto sair como planejado.</p>
     </details>`;
 }
 
@@ -819,19 +857,19 @@ const GAP_ROW = (n) => `<tr class="pr-gap" aria-hidden="true"><td colspan="${n}"
 function monthDetailHTML(r, i = 0) {
   const neg = r.saldo < 0;
   const cls = (v) => (v < 0 ? ' class="neg"' : '');
-  const row = (op, sw, label, v) => `<tr><th>${opHTML(op)}${sw}${label}</th><td${cls(v)}>${m0(v)}</td></tr>`;
+  const row = (op, sw, label, v) => `<tr><th>${opHTML(op)}${sw}${label}</th><td${cls(v)}>${mc(v)}</td></tr>`;
   return `<div class="md-head"><b>${U.monthLabel(r.mk)}</b>${neg ? '<span class="md-flag"><span class="flag-ic crit">!</span>no vermelho</span>' : ''}</div>
     <table class="md-table ledger">
       <tbody>
-        <tr class="carry"><th>${opHTML('')}<button class="pr-go" data-act="plan-prev" data-i="${i}" aria-label="Saldo anterior: ver ${U.monthName(U.addMonths(r.mk, -1))}">Saldo anterior${IC.right}</button></th><td${cls(r.start)}>${m0(r.start)}</td></tr>
+        <tr class="carry"><th>${opHTML('')}<button class="pr-go" data-act="plan-prev" data-i="${i}" aria-label="Saldo anterior: ver ${U.monthName(U.addMonths(r.mk, -1))}">Saldo anterior${IC.right}</button></th><td${cls(r.start)}>${mc(r.start)}</td></tr>
         ${GAP_ROW(2)}
       </tbody>
       <tbody class="pr-month">
         ${row('+', '<i class="sw in"></i>', 'Entra', r.receita)}${row('−', '<i class="sw out"></i>', 'Despesas', r.despesa)}${row('−', '<i class="sw inv"></i>', 'Investimento', r.invest)}
-        <tr class="month-res"><th>${opHTML('')}Sobra do mês</th><td${cls(r.saldo)}>${m0(r.saldo)}</td></tr>
+        <tr class="month-res"><th>${opHTML('')}Sobra do mês</th><td${cls(r.saldo)}>${mc(r.saldo)}</td></tr>
       </tbody>
       <tbody>${GAP_ROW(2)}</tbody>
-      <tfoot><tr><th>${opHTML('=')}<i class="sw-line"></i>Acumulado</th><td${cls(r.acc)}>${m0(r.acc)}</td></tr></tfoot>
+      <tfoot><tr><th>${opHTML('=')}<i class="sw-line"></i>Acumulado</th><td${cls(r.acc)}>${mc(r.acc)}</td></tr></tfoot>
     </table>
     ${r.extras.length ? `<p class="md-extras">Extras do mês: ${esc(U.listPT(r.extras.map((l) => l.name)))}</p>` : ''}`;
 }

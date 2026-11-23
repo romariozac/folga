@@ -18,14 +18,16 @@ export function money(cents, opts = {}) {
   } else {
     body = showCents ? fmt2.format(abs) : fmt0.format(Math.round(abs));
   }
-  const s = v < 0 ? '−' : sign && v > 0 ? '+' : '';
+  // o que arredonda para zero sai sem sinal (nada de “−R$ 0”)
+  const zero = showCents ? v === 0 : Math.round(abs) === 0;
+  const s = zero ? '' : v < 0 ? '−' : sign && v > 0 ? '+' : '';
   return `${s}R$${NBSP}${body}`;
 }
 
 /** Só o número, sem "R$" (para eixos e tabelas compactas). */
 export function num(cents, { compact = false } = {}) {
   const abs = Math.abs(cents || 0) / 100;
-  const s = cents < 0 ? '−' : '';
+  const s = cents < 0 && Math.round(abs) > 0 ? '−' : '';
   if (compact && abs >= 1000) return s + (abs >= 1e6 ? fmt1.format(abs / 1e6) + NBSP + 'mi' : fmt1.format(abs / 1e3) + NBSP + 'mil');
   return s + fmt0.format(Math.round(abs));
 }
