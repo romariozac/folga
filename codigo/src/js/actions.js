@@ -872,7 +872,7 @@ export function commitImport(items, { replaceAcertos = null, learn = [], dropWro
     count++;
     if (it.kind === 'receita') inn += it.amount;
     else if (it.kind === 'despesa') out += it.refund ? -it.amount : it.amount;
-    if (it.kind === 'invest') investMonths.add(mk);
+    if (it.kind === 'invest' && !it.refund) investMonths.add(mk);
   }
   if (skips.length) st.core.settings.dupSkip = [...(st.core.settings.dupSkip || []), ...skips].slice(-300);
   for (const r of learn) {

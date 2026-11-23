@@ -514,7 +514,7 @@ export function openImport() {
         const it = group[0];
         const total = U.sum(group, (i) => i.amount);
         const sugg = IM.suggestionsFor(S(), it.kind, [...(it.ranked || []), ...(it.kind === 'despesa' && /\b(pix|ted|doc|transf)/.test(it.nd) ? ['outros'] : [])]);
-        const title = it.kind === 'receita' ? 'Que dinheiro é esse?' : it.refund ? 'Estorno ou crédito: de qual categoria?' : it.kind === 'invest' ? 'Para onde foi?' : 'Em que categoria entra?';
+        const title = it.kind === 'receita' ? 'Que dinheiro é esse?' : it.kind === 'invest' ? (it.refund ? 'De onde saiu o resgate?' : 'Para onde foi?') : it.refund ? 'Estorno ou crédito: de qual categoria?' : 'Em que categoria entra?';
         const skip = it.kind === 'receita' ? 'Não é receita (transferência minha)' : 'Não lançar (transferência minha)';
         return `<header class="sheet-head"><div><p class="eyebrow">Pergunta ${st.qi + 1} de ${st.questions.length}</p><h2>${title}</h2></div><button class="icon-btn" data-sheet-close aria-label="Fechar">${IC.close}</button></header>
           <div class="steps">${st.questions.map((_, i) => `<i class="${i <= st.qi ? 'on' : ''}"></i>`).slice(0, 24).join('')}</div>
@@ -540,7 +540,7 @@ export function openImport() {
         const sign = it.kind === 'receita' || it.refund ? '+' : '−';
         return `<li><button type="button" class="tx" data-change="${i}">
           <span class="emo">${c.emoji}</span>
-          <span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)} · ${it.billName ? `🔗 ${esc(it.billName)}` : esc(c.name)}${it.refund ? ' · estorno' : ''}${it.parc ? ' · parcela' : ''}${it.how === 'palpite' ? ' · palpite' : it.how === 'banco' ? ' · categoria do banco' : ''}${extra}</small></span>
+          <span class="tx-txt"><b>${esc(it.desc)}</b><small>${U.dayLabel(it.date)} · ${it.billName ? `🔗 ${esc(it.billName)}` : esc(c.name)}${it.refund ? (it.kind === 'invest' ? ' · resgate' : ' · estorno') : ''}${it.parc ? ' · parcela' : ''}${it.how === 'palpite' ? ' · palpite' : it.how === 'banco' ? ' · categoria do banco' : ''}${extra}</small></span>
           <span class="tx-amt ${it.kind === 'receita' || it.refund ? 'k-receita' : ''}">${sign}${money(it.amount)}</span></button></li>`;
       };
 

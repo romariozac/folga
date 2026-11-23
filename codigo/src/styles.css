@@ -577,7 +577,8 @@ h3 {
 }
 .cn-go {
   display: inline-flex;
-  margin-left: -4px;
+  margin-left: 4px;
+  vertical-align: -2px;
 }
 .cn-go .ic {
   width: 14px;
@@ -1432,6 +1433,16 @@ h3 {
 .ledger td:last-child {
   padding-right: 10px;
 }
+/* celular estreito com valores de 5 dígitos e centavos: um pouco menos de folga entre as colunas */
+@media (max-width: 380px) {
+  .ledger td {
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+  .ledger td:last-child {
+    padding-right: 6px;
+  }
+}
 .ledger .op {
   display: inline-block;
   width: 10px;
@@ -1459,6 +1470,13 @@ h3 {
 .ledger td b {
   font-weight: 700;
 }
+/* centavos menores, como no número grande do Início: a conta fecha centavo por centavo sem pesar na leitura */
+.ledger td small {
+  font-size: 0.8em;
+  font-weight: inherit;
+  color: inherit;
+  letter-spacing: 0;
+}
 /* começo: o saldo que veio do mês anterior; o nome leva até ele */
 .ledger tr.carry th,
 .ledger tr.carry td {
@@ -1467,6 +1485,11 @@ h3 {
 }
 .ledger tr.carry th {
   font-weight: 500;
+  /* no celular estreito, o “ajustar” desce para a linha de baixo em vez de empurrar os valores para fora */
+  white-space: normal;
+}
+.ledger tr.carry .pr-go {
+  white-space: nowrap;
 }
 .pr-go {
   display: inline-flex;
@@ -1486,8 +1509,10 @@ h3 {
   color: var(--muted);
 }
 .ledger tr.carry .link {
+  display: inline-block;
   font-size: 12px;
-  padding-left: 6px;
+  margin-left: 6px;
+  padding-left: 0;
 }
 .ledger tr.pr-gap td {
   padding: 0;
@@ -1584,6 +1609,17 @@ h3 {
 }
 .bl.over .bullet i {
   background: var(--crit);
+}
+/* o que ainda vem pelo plano (contas a pagar e o resto do dia a dia): listrado, depois do que já foi */
+.bullet b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink-2) 55%, transparent) 0 3px, transparent 3px 6px);
+}
+.bl.over .bullet b {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--crit) 60%, transparent) 0 3px, transparent 3px 6px);
 }
 .bullet em {
   position: absolute;

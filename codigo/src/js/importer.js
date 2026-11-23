@@ -399,6 +399,8 @@ export function parseText(text, typeHint = null, hints = null) {
   const rows = [];
   let skip = false;
   let check = null;
+  let dcMarks = 0;
+  const unmarked = []; // valores sem D/C nem sinal
   const extras = [];
   for (const raw of text.split(/\r?\n/)) {
     const nl = norm(raw).replace(/\s+/g, ' ');
@@ -441,6 +443,8 @@ export function parseText(text, typeHint = null, hints = null) {
       const sa = parseAmount(pick[0]);
       if (date && sa) {
         const row = { date, desc, sa };
+        if (/\d\s?[DC]\s*$/i.test(pick[0])) dcMarks++;
+        else if (sa > 0) unmarked.push(row);
         // compra negada ou cancelada pelo banco: não aconteceu (a importação deixa de fora e mostra quais foram)
         const nline = norm(line);
         if (DECLINED.test(nline) && !REFUND.test(nline)) {
@@ -453,8 +457,11 @@ export function parseText(text, typeHint = null, hints = null) {
       }
     }
   }
+  // com D/C no valor (débito/crédito), o sinal já diz o que sai: não depende de haver mais saídas que entradas. Linha
+  // sem D/C no meio delas é gasto (como no exemplo do campo: “05/11 IFOOD 45,90”)
+  if (dcMarks) for (const r of unmarked) r.sa = -r.sa;
   const neg = rows.filter((r) => r.sa < 0).length;
-  const conv = neg > rows.length / 2 ? 'neg-out' : 'pos-out';
+  const conv = dcMarks || neg > rows.length / 2 ? 'neg-out' : 'pos-out';
   if (extras.length && rows.length) {
     const last = rows.map((r) => r.date).sort().pop();
     for (const e of extras) rows.push({ date: last, desc: e.desc, sa: conv === 'neg-out' ? -Math.abs(e.sa) : Math.abs(e.sa) });
@@ -670,11 +677,17 @@ export function buildBatch(S, parsed, type = parsed.type || 'conta', flip = fals
     if (type === 'cartao' && !out && (CARD_PAYMENT_RE.test(nd) || /\b(pagamento|pgto|pagto)\b/.test(nd))) return { ...it, status: 'ignore', reason: 'Pagamento da fatura' };
     if (type !== 'cartao' && out && FATURA_RE.test(nd)) return { ...it, status: 'ignore', reason: 'Pagamento da fatura do cartão: os gastos entram pela própria fatura' };
     if (SWEEP_RE.test(nd) && !(!out && REND_RE.test(nd))) return { ...it, status: 'ignore', reason: 'Aplicação ou resgate automático do banco (o dinheiro continua disponível)' };
-    if (!out && RESGATE_RE.test(nd) && !REND_RE.test(nd)) return { ...it, status: 'ignore', reason: 'Resgate de investimento (não é receita)' };
+    // resgate de um investimento: não é receita, mas o dinheiro voltou para a conta. É o contrário da aplicação (que
+    // sai como investimento): entra como investimento negativo, a conta sobe e o guardado desce.
+    const resgate = !out && RESGATE_RE.test(nd) && !REND_RE.test(nd);
     if (OWN_RE.test(nd)) return { ...it, status: 'ignore', reason: 'Transferência entre suas contas' };
 
     // 2) tipo
     if (out && INVEST_RE.test(nd)) it.kind = 'invest';
+    if (resgate) {
+      it.kind = 'invest';
+      it.refund = true;
+    }
     if (type === 'cartao' && !out) {
       it.kind = 'despesa';
       it.refund = true; // estorno ou crédito na fatura: abate do gasto
