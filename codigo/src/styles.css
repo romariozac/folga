@@ -3811,6 +3811,93 @@ details.tech code {
   padding: 0;
   font-size: 13px;
 }
+.group-help {
+  margin: 0 0 8px;
+}
+.conc-sum .link.small {
+  min-height: 32px;
+  padding: 0;
+  margin-top: 4px;
+  font-size: 13px;
+}
+/* conciliação: ligadas sozinhas e já lançadas, uma linha cada */
+.cm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in oklab, var(--lime) 60%, var(--line-2));
+  background: color-mix(in oklab, var(--lime) 6%, var(--card));
+}
+.cm {
+  display: grid;
+  gap: 4px;
+  padding: 11px 0 6px;
+  border-top: 1px solid var(--line);
+  scroll-margin: 90px;
+}
+.cm:first-child {
+  border-top: 0;
+}
+.cm-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.cm-top .emo {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  font-size: 17px;
+}
+.cm-txt {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.cm-txt b {
+  font-weight: 640;
+  font-size: 14.5px;
+  line-height: 1.3;
+}
+.cm-txt small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.cm-amt {
+  flex: none;
+  font-weight: 650;
+  font-size: 14.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cm-amt.k-receita {
+  color: var(--good-text);
+}
+.cm .cc-out {
+  margin-left: 44px;
+  font-size: 12.5px;
+}
+.cm .cc-rest {
+  margin-left: 44px;
+}
+.cm-acts {
+  display: flex;
+  gap: 16px;
+  margin-left: 44px;
+}
+.cm-acts .link.small {
+  min-height: 32px;
+  padding: 0;
+  font-size: 13px;
+}
+.cm.off .cm-txt b,
+.cm.off .cm-amt {
+  color: var(--ink-2);
+}
 .txs .tx.cur {
   font-weight: 650;
 }
