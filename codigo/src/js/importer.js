@@ -394,8 +394,21 @@ export const REFUND = /\b(estorno|estornad[ao]|devolucao|devolvid[ao]|reembolso|
 /** Palavras de status que não fazem parte do nome da loja (tiradas da descrição). */
 export const STATUS_TXT = /(^|\s)(?:(?:compra|transa[çc][ãa]o|opera[çc][ãa]o|pagamento)\s+)?(?:n[ãa]o\s+(?:foi\s+)?(?:autorizad|aprovad|conclu[íi]d|realizad|efetuad)[ao]s?|negad[ao]s?|recusad[ao]s?|reprovad[ao]s?|cancelad[ao]s?|desfeit[ao]s?|pendentes?|aprovad[ao]s?|autorizad[ao]s?|confirmad[ao]s?|processando|em\s+processamento|em\s+an[áa]lise|conclu[íi]d[ao]s?)(?=\s|$|[.,;:)])/gi;
 
+// O pagamento da fatura aparece no extrato (“PAGAMENTO FATURA CARTAO”) e o pagamento recebido aparece na fatura: nenhum
+// dos dois diz de que documento é o texto.
+export const PAY_FAT_TXT = /\b(pagamento|pagto|pgto|pag|deb(ito)?( aut(omatico)?)?)\s+(de\s+|da\s+|do\s+)?(fatura|fat|cartao)\b|\bpagamento (recebido|efetuado)\b/g;
+/** Fatura do cartão ou extrato da conta, pelas palavras do texto (D/C no fim da linha é coisa de extrato). */
+export function docType(text) {
+  const t = norm(text).replace(PAY_FAT_TXT, ' ');
+  const strong = (t.match(/\b(limite (total|disponivel)|pagamento minimo|cartao de credito|melhor dia de compra)\b/g) || []).length;
+  const card = strong * 3 + (t.match(/\b(fatura|vencimento|fechamento|anuidade)\b/g) || []).length;
+  const dc = (t.match(/\d,\d{2}\s?[dc]\s*$/gm) || []).length;
+  const conta = dc * 3 + (t.match(/\b(saldo do dia|extrato|pix|transferencia|ted|deposito|conta corrente|rendimento|boleto|recebid[oa]|salario)\b/g) || []).length;
+  return card > conta ? 'cartao' : 'conta';
+}
+
 export function parseText(text, typeHint = null, hints = null) {
-  const type = typeHint || (/fatura|limite (total|dispon)|pagamento m[ií]nimo|cart[aã]o de cr[eé]dito/i.test(text) ? 'cartao' : 'conta');
+  const type = typeHint || docType(text);
   const rows = [];
   let skip = false;
   let check = null;

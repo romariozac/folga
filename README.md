@@ -86,25 +86,38 @@ Botão **+** → ícone ⬇︎, ou *Ajustes › Importar extrato ou fatura*.
 - **Texto colado com D/C** (débito/crédito): o D e o C dizem o que sai e o que entra, mesmo que haja mais entradas que
   saídas; uma linha sem D nem C no meio delas é gasto.
 - **Desfazer:** logo depois de importar, o aviso traz o botão **Desfazer** (10 segundos), que apaga a importação inteira.
-- **Conciliação com o plano** (toda importação que tiver contas do plano no período): antes das perguntas, o app
-  mostra, lado a lado, o lançamento do extrato e o item do plano que ele parece pagar, com o motivo (mesmo valor,
-  mesmo nome, mesma categoria, perto do vencimento, a parcela certa, igual da última vez). Você toca **É o mesmo** ou
-  **Não é**, e cada cartão diz o que vai acontecer:
+- **Contas do plano (conciliação)** (toda importação que tiver contas do plano no período): a primeira tela resume o
+  que vai acontecer: quantas contas **para você confirmar**, quantas foram **ligadas sozinhas** (com os nomes), os
+  lançamentos que **você já tinha feito** (não entram de novo) e as contas do plano que **não apareceram** no extrato.
+  Quando há o que confirmar, o botão é **Confirmar N contas do plano**; quando não há, a importação segue direto para as
+  perguntas ou a revisão, e **Ver as contas do plano** abre a lista. Ligar um lançamento a uma conta deixa a conta
+  paga com o valor do extrato, sem contar duas vezes:
   - a conta ainda estava em aberto: ela fica paga, com o valor do extrato;
   - a conta já estava marcada (por você ou no **automático**): fica só o lançamento do extrato, no lugar da marcação,
     com o valor e a data reais (ex.: a “Luz” de R$ 150 marcada sozinha vira o débito da Energisa de R$ 187,32);
   - você já tinha lançado à mão (mesmo valor, até 3 dias de diferença): não lança de novo.
 
-  Quando há sinal de que é a mesma coisa (nome, categoria, parcela, a mesma pessoa da última vez), o par já vem ligado;
-  quando só o valor bate (um Pix de R$ 1.200 perto do dia do aluguel), ele aparece em **Confira** e espera a sua
-  resposta. Errou o item? **Escolher outro item do plano**. E as contas do período que ficaram sem par aparecem em
-  **No plano, sem par aqui**: toque numa e escolha o lançamento do extrato que é ela. Essas listas só mostram o que
-  ainda não está conciliado (se o item do plano é a fatura do cartão, o pagamento da fatura, que a importação ignora,
-  também aparece). Depois de ligar uma vez, o app reconhece sozinho nas próximas importações. Contas pagas adiantado
-  (aluguel no dia 30 para o dia 5) também casam.
+  A tela **Contas do plano** tem quatro partes. **Confirme**: quando só o valor bate (um Pix de R$ 1.200 perto do dia do
+  aluguel), o cartão mostra o lançamento e a conta lado a lado, com o motivo, e diz antes da resposta o que cada uma faz
+  (*“Aluguel” já está marcada como paga. Se for o mesmo, fica só este lançamento… Se não for, ele entra separado.*);
+  você toca **É o mesmo** ou **Não é**. **Ligadas sozinhas**: quando há sinal de que é a mesma coisa (nome, categoria,
+  parcela, a mesma pessoa da última vez), uma linha curta por conta, com o que acontece (*“Luz” estava marcada com
+  R$ 150,00: passa a R$ 187,32, o valor do extrato.*) e **Não é** para desligar (desligada, a linha avisa se a conta
+  fica contada duas vezes, com **É o mesmo** e **É outro item do plano**). **Você já tinha lançado**: o mesmo, para o que
+  não entra de novo. **Não apareceram no extrato**: as contas do período sem lançamento ligado (abertas quando são até
+  3); toque numa e escolha o lançamento que é ela (se o item do plano é a fatura do cartão, o pagamento da fatura, que a
+  importação ignora, também aparece; ligada assim, a linha diz *você escolheu*). Depois de ligar uma vez, o app
+  reconhece sozinho nas próximas importações. Contas pagas adiantado (aluguel no dia 30 para o dia 5) também casam. Na
+  revisão, *N ligados a contas do plano* lista quais, com **Rever as contas do plano**.
+- **Extrato ou fatura:** o texto colado (ou o PDF) é lido como fatura do cartão pelas palavras dela (limite, pagamento
+  mínimo, vencimento…) e como extrato pelas da conta (Pix, TED, saldo do dia, D/C no fim da linha…). O pagamento da
+  fatura que aparece no extrato (“PAGAMENTO FATURA CARTAO”) e o pagamento recebido na fatura não contam para nenhum dos
+  dois: antes, um extrato com o pagamento da fatura era lido como fatura (o salário virava estorno do cartão). Dá para
+  trocar em **Isto é**.
 - **Conciliar na pergunta:** nas perguntas (“Em que categoria entra?”, “Que dinheiro é esse?”), o bloco **É de um item
-  do plano?** mostra os itens do plano ainda sem par mais parecidos com o lançamento; um toque concilia, e **Outro item
-  do plano** abre a lista inteira. Assim nada passa batido.
+  do plano?** mostra os itens do plano ainda sem par mais parecidos com o lançamento; um toque liga, e **Outro item
+  do plano** abre a lista inteira. A conta que você já disse que não é (em **Confirme**) não volta como sugestão.
+  Assim nada passa batido.
 - **Pagou só parte?** Ao marcar uma conta com valor menor que o previsto (na tela *Quanto pagou?* ou na conciliação),
   aparece **Passar o resto (R$ …) para o mês seguinte**. Marcado, o resto vira um item “só em” do mês seguinte
   (ex.: *Fatura de cartão · resto de nov*): entra nas contas a pagar e na sobra prevista de lá, e sai do mês da conta,

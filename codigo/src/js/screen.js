@@ -4,7 +4,7 @@
 // se o dinheiro entrou ou saiu pelo sinal, pela cor do valor e pelas palavras.
 import * as U from './util.js';
 import { norm } from './model.js';
-import { parseDate, bankCatToId, DECLINED, REFUND, STATUS_TXT } from './importer.js';
+import { parseDate, bankCatToId, DECLINED, REFUND, STATUS_TXT, PAY_FAT_TXT } from './importer.js';
 
 /** Conserta o que o OCR costuma errar em valores: "RS 45,90", "R$45.90", "1.234 ,56", "1O,00". */
 export function fixOcrText(t) {
@@ -340,8 +340,10 @@ export function parseScreens(pages) {
   });
 
   // tipo de documento: fatura do cartão ou extrato da conta
-  const cardScore = (all.match(/\b(fatura|limite|vencimento|fechamento|parcela|cartao|anuidade)\b/g) || []).length;
-  const contaScore = (all.match(/\b(saldo|extrato|pix|transferencia|ted|deposito|conta corrente|rendimento|boleto|recebid[oa])\b/g) || []).length;
+  // “Pagamento de fatura” no extrato e “Pagamento recebido” na fatura não dizem o tipo (aparecem no outro documento)
+  const kind = all.replace(PAY_FAT_TXT, ' ');
+  const cardScore = (kind.match(/\b(fatura|limite|vencimento|fechamento|parcela|cartao|anuidade)\b/g) || []).length;
+  const contaScore = (kind.match(/\b(saldo|extrato|pix|transferencia|ted|deposito|conta corrente|rendimento|boleto|recebid[oa])\b/g) || []).length;
   const type = cardScore >= contaScore ? 'cartao' : 'conta';
   const bank = /\bnubank\b|nu pagamentos/.test(all) ? 'Nubank' : /\bitau\b|itaucard/.test(all) ? 'Itaú' : /\bsantander\b/.test(all) ? 'Santander' : /\bcaixa\b/.test(all) ? 'Caixa' : '';
 
